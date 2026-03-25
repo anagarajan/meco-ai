@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MeCo.AI — Architecture</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg:        #0a0a0f;
+      --surface:   #12121a;
+      --card:      #1a1a26;
+      --border:    #2a2a3e;
+      --accent:    #6366f1;
+      --accent2:   #8b5cf6;
+      --accent3:   #06b6d4;
+      --green:     #10b981;
+      --yellow:    #f59e0b;
+      --red:       #ef4444;
+      --text:      #e2e8f0;
+      --muted:     #94a3b8;
+      --code-bg:   #0d1117;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(10,10,15,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      display: flex; align-items: center; gap: 24px; height: 52px;
+    }
+    nav .logo { font-weight: 700; font-size: 15px; color: var(--accent); letter-spacing: -0.3px; white-space: nowrap; }
+    nav a { color: var(--muted); text-decoration: none; font-size: 13px; white-space: nowrap; transition: color 0.15s; }
+    nav a:hover { color: var(--text); }
+    nav .divider { flex: 1; }
+
+    /* ── HERO ── */
+    .hero {
+      text-align: center; padding: 80px 32px 56px;
+      background: radial-gradient(ellipse 80% 40% at 50% 0%, rgba(99,102,241,0.15) 0%, transparent 70%);
+    }
+    .hero .badge {
+      display: inline-block; padding: 4px 14px; border-radius: 20px;
+      background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.3);
+      color: var(--accent); font-size: 12px; font-weight: 600; letter-spacing: 0.5px;
+      text-transform: uppercase; margin-bottom: 20px;
+    }
+    .hero h1 { font-size: 48px; font-weight: 800; letter-spacing: -1.5px; line-height: 1.1; margin-bottom: 16px; }
+    .hero h1 span { background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero p { color: var(--muted); font-size: 17px; max-width: 580px; margin: 0 auto 36px; }
+    .hero .pills { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+    .pill {
+      padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      border: 1px solid; letter-spacing: 0.3px;
+    }
+    .pill-blue  { color: var(--accent);  border-color: rgba(99,102,241,0.4);  background: rgba(99,102,241,0.08); }
+    .pill-purple{ color: var(--accent2); border-color: rgba(139,92,246,0.4); background: rgba(139,92,246,0.08); }
+    .pill-cyan  { color: var(--accent3); border-color: rgba(6,182,212,0.4);  background: rgba(6,182,212,0.08); }
+    .pill-green { color: var(--green);   border-color: rgba(16,185,129,0.4); background: rgba(16,185,129,0.08); }
+
+    /* ── LAYOUT ── */
+    .page { max-width: 1200px; margin: 0 auto; padding: 0 32px 80px; }
+    section { margin-bottom: 80px; }
+    .section-header { margin-bottom: 32px; }
+    .section-header .num {
+      font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+      color: var(--accent); margin-bottom: 8px;
+    }
+    .section-header h2 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+    .section-header p { color: var(--muted); margin-top: 8px; font-size: 15px; }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 24px; overflow: hidden;
+    }
+    .card-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 16px; }
+
+    /* ── GRID LAYOUTS ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    @media (max-width: 900px) {
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    }
+
+    /* ── MERMAID ── */
+    .diagram-wrap {
+      background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+      padding: 32px 24px; overflow-x: auto;
+    }
+    .diagram-wrap .mermaid { min-width: 600px; }
+
+    /* ── LAYERS ── */
+    .layers { display: flex; flex-direction: column; gap: 3px; }
+    .layer {
+      display: flex; align-items: center; gap: 16px;
+      padding: 16px 20px; border-radius: 10px; border: 1px solid;
+    }
+    .layer-icon { font-size: 20px; flex-shrink: 0; }
+    .layer-label { font-weight: 600; font-size: 14px; }
+    .layer-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .layer-arrow { text-align: center; color: var(--muted); font-size: 18px; line-height: 1; }
+
+    .l1 { background: rgba(99,102,241,0.08);  border-color: rgba(99,102,241,0.25); }
+    .l2 { background: rgba(139,92,246,0.08); border-color: rgba(139,92,246,0.25); }
+    .l3 { background: rgba(6,182,212,0.08);  border-color: rgba(6,182,212,0.25); }
+    .l4 { background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.25); }
+    .l5 { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.25); }
+
+    /* ── SERVICE MAP ── */
+    .service-group { margin-bottom: 24px; }
+    .service-group-title {
+      font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 10px; padding-left: 4px;
+    }
+    .service-list { display: flex; flex-direction: column; gap: 6px; }
+    .service-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 14px; border-radius: 10px;
+      background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+    }
+    .service-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .service-name { font-weight: 600; font-size: 13px; flex: 1; }
+    .service-desc { font-size: 12px; color: var(--muted); }
+    .service-lines { font-size: 11px; color: var(--muted); opacity: 0.7; }
+
+    /* ── DB SCHEMA ── */
+    .db-table { margin-bottom: 20px; }
+    .db-table-name {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;
+      color: var(--accent3); margin-bottom: 8px;
+    }
+    .db-cols { display: flex; flex-direction: column; gap: 2px; }
+    .db-col {
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 12px; border-radius: 6px;
+      background: rgba(255,255,255,0.02); border: 1px solid transparent;
+    }
+    .db-col.pk { border-color: rgba(99,102,241,0.3); background: rgba(99,102,241,0.05); }
+    .db-col.fk { border-color: rgba(6,182,212,0.2); }
+    .db-col-name { font-weight: 600; font-size: 12px; flex: 1; font-family: 'SF Mono', monospace; }
+    .db-col-type { font-size: 11px; color: var(--accent2); font-family: 'SF Mono', monospace; }
+    .db-badge {
+      font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .db-pk { background: rgba(99,102,241,0.2); color: var(--accent); }
+    .db-fk { background: rgba(6,182,212,0.2); color: var(--accent3); }
+    .db-idx{ background: rgba(16,185,129,0.2); color: var(--green); }
+
+    /* ── FLOW STEPS ── */
+    .flow { display: flex; flex-direction: column; gap: 0; }
+    .flow-step {
+      display: flex; gap: 16px; align-items: flex-start; position: relative;
+    }
+    .flow-step:not(:last-child)::before {
+      content: ''; position: absolute; left: 17px; top: 36px;
+      width: 2px; height: calc(100% + 4px);
+      background: linear-gradient(to bottom, var(--border), transparent);
+    }
+    .flow-step-num {
+      width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 13px; position: relative; z-index: 1;
+    }
+    .flow-step-body { padding: 8px 0 20px; }
+    .flow-step-title { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+    .flow-step-desc { color: var(--muted); font-size: 13px; }
+    .flow-step-code {
+      font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px;
+      background: var(--code-bg); border: 1px solid var(--border);
+      padding: 8px 12px; border-radius: 8px; margin-top: 8px; color: #7dd3fc;
+      white-space: pre;
+    }
+
+    .step-blue   { background: rgba(99,102,241,0.2); color: var(--accent); }
+    .step-purple { background: rgba(139,92,246,0.2); color: var(--accent2); }
+    .step-cyan   { background: rgba(6,182,212,0.2);  color: var(--accent3); }
+    .step-green  { background: rgba(16,185,129,0.2); color: var(--green); }
+    .step-yellow { background: rgba(245,158,11,0.2); color: var(--yellow); }
+
+    /* ── PROVIDER CARDS ── */
+    .provider-card {
+      border-radius: 14px; padding: 20px; border: 1px solid var(--border);
+    }
+    .provider-card .provider-logo {
+      width: 36px; height: 36px; border-radius: 10px; display: flex;
+      align-items: center; justify-content: center; font-size: 18px; margin-bottom: 12px;
+    }
+    .provider-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+    .provider-card .caps { display: flex; flex-direction: column; gap: 6px; }
+    .cap-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+    .cap-icon { width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; flex-shrink: 0; }
+    .cap-yes { background: rgba(16,185,129,0.2); color: var(--green); }
+    .cap-no  { background: rgba(239,68,68,0.15); color: var(--red); }
+    .cap-local { background: rgba(245,158,11,0.15); color: var(--yellow); }
+
+    /* ── ALGORITHM BOX ── */
+    .algo-box {
+      background: var(--code-bg); border: 1px solid var(--border); border-radius: 12px;
+      padding: 20px 24px; font-family: 'SF Mono', monospace; font-size: 12px;
+      line-height: 1.8; color: #94a3b8;
+    }
+    .algo-box .kw  { color: #c084fc; }
+    .algo-box .fn  { color: #60a5fa; }
+    .algo-box .num { color: #34d399; }
+    .algo-box .str { color: #fca5a5; }
+    .algo-box .cmt { color: #4b5563; }
+
+    /* ── HOOK MAP ── */
+    .hook-item {
+      padding: 16px; border-radius: 12px;
+      background: rgba(255,255,255,0.02); border: 1px solid var(--border);
+    }
+    .hook-item h4 { font-size: 13px; font-weight: 700; font-family: 'SF Mono', monospace; color: var(--accent2); margin-bottom: 6px; }
+    .hook-item .hook-desc { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+    .hook-item .hook-exports { display: flex; flex-wrap: wrap; gap: 6px; }
+    .hook-export { font-size: 11px; padding: 2px 8px; border-radius: 5px; background: rgba(99,102,241,0.12); color: var(--accent); font-family: 'SF Mono', monospace; }
+
+    /* ── SECURITY CHECKLIST ── */
+    .check-list { display: flex; flex-direction: column; gap: 10px; }
+    .check-item { display: flex; align-items: flex-start; gap: 12px; }
+    .check-icon { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; margin-top: 1px; }
+    .check-pass { background: rgba(16,185,129,0.2); color: var(--green); }
+    .check-warn { background: rgba(245,158,11,0.15); color: var(--yellow); }
+    .check-title { font-size: 13px; font-weight: 600; }
+    .check-detail { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    /* ── TABLE ── */
+    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .data-table th {
+      text-align: left; padding: 10px 16px; font-size: 11px; font-weight: 600;
+      letter-spacing: 0.8px; text-transform: uppercase; color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+    .data-table td { padding: 10px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: rgba(255,255,255,0.02); }
+    code { font-family: 'SF Mono', monospace; font-size: 11px; background: rgba(99,102,241,0.1); padding: 2px 6px; border-radius: 4px; color: var(--accent2); }
+
+    /* ── VOICE PATHS ── */
+    .voice-path {
+      padding: 20px; border-radius: 12px; border: 1px solid; flex: 1;
+    }
+    .voice-path h3 { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+    .voice-path ul { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+    .voice-path li { font-size: 13px; color: var(--muted); padding-left: 16px; position: relative; }
+    .voice-path li::before { content: '→'; position: absolute; left: 0; color: var(--muted); }
+    .vp-cloud { background: rgba(99,102,241,0.06); border-color: rgba(99,102,241,0.25); }
+    .vp-local  { background: rgba(16,185,129,0.06); border-color: rgba(16,185,129,0.25); }
+    .voice-paths-wrap { display: flex; gap: 16px; }
+    @media (max-width: 700px) { .voice-paths-wrap { flex-direction: column; } }
+
+    /* ── FOOTER ── */
+    footer {
+      text-align: center; padding: 40px 32px;
+      color: var(--muted); font-size: 13px;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">⬡ MeCo.AI</div>
+  <a href="#overview">Overview</a>
+  <a href="#layers">Layers</a>
+  <a href="#components">Components</a>
+  <a href="#providers">AI Providers</a>
+  <a href="#flows">Data Flows</a>
+  <a href="#database">Database</a>
+  <a href="#voice">Voice</a>
+  <a href="#security">Security</a>
+  <a href="#hooks">Hooks</a>
+  <div class="divider"></div>
+  <span class="pill pill-blue">React 19</span>
+  <span class="pill pill-cyan">TypeScript</span>
+</nav>
+
+<!-- ── HERO ── -->
+<div class="hero">
+  <div class="badge">Architecture Document</div>
+  <h1>MeCo.AI<br><span>Complete System Design</span></h1>
+  <p>A privacy-first, local-first PWA for storing and retrieving personal memories using RAG, vector embeddings, and multimodal AI — entirely in the browser.</p>
+  <div class="pills">
+    <span class="pill pill-blue">React 19 + TypeScript</span>
+    <span class="pill pill-purple">Vite + Tailwind v4</span>
+    <span class="pill pill-cyan">Dexie 4 + IndexedDB</span>
+    <span class="pill pill-green">OpenAI / Anthropic</span>
+    <span class="pill pill-blue">PWA (iOS + Android)</span>
+    <span class="pill pill-purple">RAG Pipeline</span>
+    <span class="pill pill-cyan">256-dim Embeddings</span>
+    <span class="pill pill-green">Zero Backend</span>
+  </div>
+</div>
+
+<div class="page">
+
+<!-- ── 1. HIGH-LEVEL OVERVIEW ── -->
+<section id="overview">
+  <div class="section-header">
+    <div class="num">01 — High Level</div>
+    <h2>System Overview</h2>
+    <p>Single-page app with zero backend — all data, logic, and AI calls run client-side.</p>
+  </div>
+  <div class="diagram-wrap">
+    <div class="mermaid">
+graph TB
+    subgraph Device["📱 User Device (Browser / PWA)"]
+        subgraph UI["Presentation Layer"]
+            Composer["🎤 Composer\n(text, image, voice)"]
+            Conversation["💬 Conversation"]
+            MemoryLedger["📚 Memory Ledger"]
+            Settings["⚙️ Settings / Privacy"]
+        end
+        subgraph Hooks["Hooks (State + Logic)"]
+            UMC["useMemoryCompanion\n(orchestrator)"]
+            UVR["useVoiceRecorder"]
+            USR["useSpeechRecognition"]
+            URM["useRelatedMemory"]
+        end
+        subgraph Services["Services"]
+            Registry["AI Registry\n(provider selector)"]
+            Extractor["Memory Extractor"]
+            Retrieval["Retrieval Service\n(RAG)"]
+            Privacy["Privacy Service"]
+        end
+        subgraph Storage["Dexie IndexedDB"]
+            Messages["messages"]
+            Memories["memory_items"]
+            Embeddings["memory_embeddings"]
+            Assets["assets"]
+            Reminders["reminders"]
+            SettingsDB["settings"]
+        end
+    end
+
+    subgraph Cloud["☁️ Cloud (direct browser calls, user's key)"]
+        OpenAI["OpenAI API\n(embed, chat, vision, whisper)"]
+        Anthropic["Anthropic API\n(claude haiku/sonnet)"]
+    end
+
+    UI --> Hooks
+    Hooks --> Services
+    Services --> Storage
+    Services --> Registry
+    Registry --> OpenAI
+    Registry --> Anthropic
+
+    style Device fill:#12121a,stroke:#2a2a3e,color:#e2e8f0
+    style Cloud fill:#0d1117,stroke:#2a2a3e,color:#e2e8f0
+    style UI fill:#1a1a26,stroke:#6366f1,color:#e2e8f0
+    style Hooks fill:#1a1a26,stroke:#8b5cf6,color:#e2e8f0
+    style Services fill:#1a1a26,stroke:#06b6d4,color:#e2e8f0
+    style Storage fill:#1a1a26,stroke:#10b981,color:#e2e8f0
+    </div>
+  </div>
+</section>
+
+<!-- ── 2. LAYERED ARCHITECTURE ── -->
+<section id="layers">
+  <div class="section-header">
+    <div class="num">02 — Architecture Layers</div>
+    <h2>Layered Architecture</h2>
+    <p>Five clean layers with strict downward dependency flow.</p>
+  </div>
+  <div class="card">
+    <div class="layers">
+      <div class="layer l1">
+        <div class="layer-icon">🎨</div>
+        <div>
+          <div class="layer-label">Presentation Layer</div>
+          <div class="layer-desc">React components · Tailwind CSS v4 · Lucide icons · Radix UI primitives</div>
+          <div class="layer-desc" style="margin-top:4px;opacity:0.6">App.tsx · Composer · Conversation · MemoryLedger · SettingsPanel · PrivacyPanel · LockScreen · TabBar · Sidebar · OnboardingOverlay</div>
+        </div>
+      </div>
+      <div class="layer-arrow">↓</div>
+      <div class="layer l2">
+        <div class="layer-icon">🪝</div>
+        <div>
+          <div class="layer-label">Hooks Layer — State Management &amp; Business Logic</div>
+          <div class="layer-desc">React hooks bridge UI events to service calls. Hold all mutable state.</div>
+          <div class="layer-desc" style="margin-top:4px;opacity:0.6">useMemoryCompanion · useVoiceRecorder · useSpeechRecognition · useRelatedMemory · useOnboarding · useTheme</div>
+        </div>
+      </div>
+      <div class="layer-arrow">↓</div>
+      <div class="layer l3">
+        <div class="layer-icon">⚙️</div>
+        <div>
+          <div class="layer-label">Services Layer — Domain Logic</div>
+          <div class="layer-desc">Stateless pure functions and classes. No React deps. Fully testable.</div>
+          <div class="layer-desc" style="margin-top:4px;opacity:0.6">AI Registry · Extractor · Retrieval Service · Duplicate Detector · Privacy Service · Migration Service</div>
+        </div>
+      </div>
+      <div class="layer-arrow">↓</div>
+      <div class="layer l4">
+        <div class="layer-icon">🗄️</div>
+        <div>
+          <div class="layer-label">Data Access Layer</div>
+          <div class="layer-desc">Dexie 4 ORM over IndexedDB. Repository pattern. Transactional ops.</div>
+          <div class="layer-desc" style="margin-top:4px;opacity:0.6">localRepository.ts · database.ts (schema v2 · 6 tables)</div>
+        </div>
+      </div>
+      <div class="layer-arrow">↓</div>
+      <div class="layer l5">
+        <div class="layer-icon">🔧</div>
+        <div>
+          <div class="layer-label">Utilities &amp; Types</div>
+          <div class="layer-desc">Zero-dependency helpers. Shared domain types.</div>
+          <div class="layer-desc" style="margin-top:4px;opacity:0.6">crypto.ts · ids.ts · notifications.ts · date.ts · domain.ts</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 3. COMPONENT HIERARCHY ── -->
+<section id="components">
+  <div class="section-header">
+    <div class="num">03 — Components</div>
+    <h2>Component Hierarchy</h2>
+    <p>App.tsx is the single root. Layout adapts at the lg breakpoint (desktop sidebar vs mobile tab bar).</p>
+  </div>
+  <div class="diagram-wrap">
+    <div class="mermaid">
+graph TD
+    App["App.tsx\n264 lines"]
+
+    App --> LS["LockScreen\n103 lines"]
+    App --> OO["OnboardingOverlay\n83 lines"]
+    App --> SB["Sidebar\n110 lines\n(desktop only)"]
+    App --> TB["TabBar\n58 lines\n(mobile only)"]
+    App --> Chat["Chat Panel"]
+    App --> ML["MemoryLedger\n325 lines"]
+    App --> PP["PrivacyPanel\n214 lines"]
+    App --> SP["SettingsPanel\n378 lines"]
+
+    Chat --> Composer["Composer\n282 lines"]
+    Chat --> Conversation["Conversation\n76 lines"]
+    SP --> SW["ui/switch.tsx\n29 lines"]
+
+    style App fill:#1a1a26,stroke:#6366f1,color:#e2e8f0
+    style Chat fill:#1a1a26,stroke:#6366f1,color:#e2e8f0
+    style LS fill:#1a1a26,stroke:#8b5cf6,color:#e2e8f0
+    style OO fill:#1a1a26,stroke:#8b5cf6,color:#e2e8f0
+    </div>
+  </div>
+</section>
+
+<!-- ── 4. AI PROVIDERS ── -->
+<section id="providers">
+  <div class="section-header">
+    <div class="num">04 — AI Providers</div>
+    <h2>AI Provider Architecture</h2>
+    <p>Pluggable provider pattern. Registry selects at runtime based on available API keys and user preference. Auto-detects fallback when configured provider has no key.</p>
+  </div>
+  <div class="diagram-wrap" style="margin-bottom:24px">
+    <div class="mermaid">
+flowchart TD
+    Settings["AppSettings\n(openai_key, anthropic_key, default_provider)"]
+    Settings --> Registry["getAIRegistry()"]
+
+    Registry -->|"wantsOpenAI && hasOpenAI\nOR (wantsAnthropic && !hasAnthropic && hasOpenAI)"| OAI["OpenAI Registry"]
+    Registry -->|"wantsAnthropic && hasAnthropic\nOR (wantsOpenAI && !hasOpenAI && hasAnthropic)"| ANT["Anthropic Registry"]
+    Registry -->|"no keys at all"| ERR["throw Error"]
+
+    OAI --> OE["OpenAIEmbeddingProvider\ntext-embedding-3-small"]
+    OAI --> OR["OpenAIReasoningProvider\ngpt-4.1-mini"]
+    OAI --> OT["OpenAITranscriptionProvider\ngpt-4o-mini-transcribe"]
+    OAI --> OI["OpenAIImageExtractionProvider\ngpt-4-vision"]
+    OAI --> OM["OpenAIMemoryExtractionProvider\ngpt-4.1-mini"]
+
+    ANT --> LE["LocalEmbeddingProvider\n256-dim n-gram hashing"]
+    ANT --> AR["AnthropicReasoningProvider\nclaude-haiku-4-5"]
+    ANT --> AT["OpenAI Whisper\nIF openai_key set\nELSE OS Speech API"]
+    ANT --> AI["AnthropicImageExtractionProvider\nclaude-haiku-4-5"]
+    ANT --> AM["AnthropicMemoryExtractionProvider\nclaude-haiku-4-5"]
+
+    style Settings fill:#1a1a26,stroke:#6366f1,color:#e2e8f0
+    style Registry fill:#1a1a26,stroke:#8b5cf6,color:#e2e8f0
+    style OAI fill:#1a1a26,stroke:#06b6d4,color:#e2e8f0
+    style ANT fill:#1a1a26,stroke:#8b5cf6,color:#e2e8f0
+    style ERR fill:#1a0505,stroke:#ef4444,color:#fca5a5
+    </div>
+  </div>
+
+  <div class="grid-3">
+    <div class="provider-card" style="background:rgba(99,102,241,0.06);border-color:rgba(99,102,241,0.3)">
+      <div class="provider-logo" style="background:rgba(99,102,241,0.2)">🔮</div>
+      <h3>OpenAI</h3>
+      <div class="caps">
+        <div class="cap-row"><div class="cap-icon cap-yes">✓</div> Embeddings (API)</div>
+        <div class="cap-row"><div class="cap-icon cap-yes">✓</div> Reasoning (Chat)</div>
+        <div class="cap-row"><div class="cap-icon cap-yes">✓</div> Memory Extraction</div>
+        <div class="cap-row"><div class="cap-icon cap-yes">✓</div> Vision / Image OCR</div>
+        <div class="cap-row"><div class="cap-icon cap-yes">✓</div> Whisper Transcription</div>
+      </div>
+    </div>
+    <div class="provider-card" style="background:rgba(139,92,246,0.06);border-color:rgba(139,92,246,0.3)">
+      <div class="provider-logo" style="background:rgba(139,92,246,0.2)">✦</div>
+      <h3>Anthropic</h3>
+      <div class="caps">
+        <div class="cap-row"><div class="cap-icon cap-local">~</div> Embeddings (local n-gram)</div>
+        <div class="cap-row"><div class="cap-icon cap-yes">✓</div> Reasoning (Claude Haiku)</div>
+        <div class="cap-row"><div class="cap-icon cap-yes">✓</div> Memory Extraction</div>
+        <div class="cap-row"><div class="cap-icon cap-yes">✓</div> Vision / Image OCR</div>
+        <div class="cap-row"><div class="cap-icon cap-local">~</div> Transcription (OS Speech)</div>
+      </div>
+    </div>
+    <div class="provider-card" style="background:rgba(16,185,129,0.06);border-color:rgba(16,185,129,0.3)">
+      <div class="provider-logo" style="background:rgba(16,185,129,0.2)">🧮</div>
+      <h3>Local Heuristic (Embeddings)</h3>
+      <div class="caps">
+        <div class="cap-row"><div class="cap-icon cap-yes">✓</div> 256-dim n-gram hashing</div>
+        <div class="cap-row"><div class="cap-icon cap-yes">✓</div> Token weights (2×)</div>
+        <div class="cap-row"><div class="cap-icon cap-yes">✓</div> 3-grams + 4-grams (1× each)</div>
+        <div class="cap-row"><div class="cap-icon cap-yes">✓</div> L2 normalized</div>
+        <div class="cap-row"><div class="cap-icon cap-yes">✓</div> Used for Anthropic path only</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 5. DATA FLOWS ── -->
+<section id="flows">
+  <div class="section-header">
+    <div class="num">05 — Data Flows</div>
+    <h2>Control &amp; Data Flow</h2>
+    <p>Three primary flows: Remember (save), Ask (retrieve), and Settings Change (reindex).</p>
+  </div>
+
+  <div class="grid-2" style="margin-bottom:24px">
+
+    <!-- Remember Flow -->
+    <div class="card">
+      <div class="card-title">Remember Mode — Save a Memory</div>
+      <div class="flow">
+        <div class="flow-step">
+          <div class="flow-step-num step-blue">1</div>
+          <div class="flow-step-body">
+            <div class="flow-step-title">User submits in Composer</div>
+            <div class="flow-step-desc">Text / image blob / voice recording. Mode = "remember" detected by trigger words.</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-step-num step-blue">2</div>
+          <div class="flow-step-body">
+            <div class="flow-step-title">Save raw asset</div>
+            <div class="flow-step-desc">Image or audio blob persisted to <code>assets</code> table with auto-delete schedule.</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-step-num step-purple">3</div>
+          <div class="flow-step-body">
+            <div class="flow-step-title">Multimodal extraction</div>
+            <div class="flow-step-desc">Audio → Whisper/OS Speech → text. Image → Vision API → text. Text normalized.</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-step-num step-purple">4</div>
+          <div class="flow-step-body">
+            <div class="flow-step-title">Memory extraction (AI)</div>
+            <div class="flow-step-desc">AI classifies <code>memory_type</code>, extracts <code>canonical_text</code>, <code>subject</code>, <code>confidence</code>.</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-step-num step-cyan">5</div>
+          <div class="flow-step-body">
+            <div class="flow-step-title">Embed &amp; duplicate check</div>
+            <div class="flow-step-desc">Generate 256/1536-dim embedding. Cosine similarity against all active memories. Warn if &gt;0.82.</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-step-num step-green">6</div>
+          <div class="flow-step-body">
+            <div class="flow-step-title">Persist to IndexedDB</div>
+            <div class="flow-step-desc"><code>memory_items</code> + <code>memory_embeddings</code> written atomically. Previous conflicting memory marked superseded.</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-step-num step-yellow">7</div>
+          <div class="flow-step-body">
+            <div class="flow-step-title">Confirmation reply</div>
+            <div class="flow-step-desc">Assistant message with success/duplicate/conflict status. UI refreshes.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ask Flow -->
+    <div class="card">
+      <div class="card-title">Ask Mode — RAG Retrieval Pipeline</div>
+      <div class="flow">
+        <div class="flow-step">
+          <div class="flow-step-num step-blue">1</div>
+          <div class="flow-step-body">
+            <div class="flow-step-title">User submits question</div>
+            <div class="flow-step-desc">Text or voice. Voice transcribed first. Mode = "ask" (no trigger words).</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-step-num step-cyan">2</div>
+          <div class="flow-step-body">
+            <div class="flow-step-title">Embed query</div>
+            <div class="flow-step-desc">Same embedding provider as memories. Ensures vector space alignment.</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-step-num step-cyan">3</div>
+          <div class="flow-step-body">
+            <div class="flow-step-title">Cosine similarity scan</div>
+            <div class="flow-step-desc">Dot product against all <code>memory_embeddings</code>. Filter &gt;0.02 threshold.</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-step-num step-purple">4</div>
+          <div class="flow-step-body">
+            <div class="flow-step-title">Rerank candidates</div>
+            <div class="flow-step-desc">Composite score = semantic + age_boost + confidence×0.15 + subject_match + type_match - superseded_penalty.</div>
+            <div class="flow-step-code">score = semantic
+  + age_boost          // recent = higher
+  + confidence × 0.15  // memory quality
+  + 0.5 (exact subj)   // or 0.25 (contains)
+  + 0.15 (type match)  // inferred type
+  - 0.25 (superseded)  // penalize stale</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-step-num step-purple">5</div>
+          <div class="flow-step-body">
+            <div class="flow-step-title">Select top-3</div>
+            <div class="flow-step-desc">Top candidates formatted with date, source_kind, confidence into reasoning context.</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-step-num step-yellow">6</div>
+          <div class="flow-step-body">
+            <div class="flow-step-title">AI reasoning</div>
+            <div class="flow-step-desc">ReasoningProvider answers using only provided context. States uncertainty explicitly.</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-step-num step-green">7</div>
+          <div class="flow-step-body">
+            <div class="flow-step-title">Format &amp; display answer</div>
+            <div class="flow-step-desc">Response appended to chat history. Low-confidence memories flagged inline.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings / Reindex flow -->
+  <div class="diagram-wrap">
+    <div class="card-title" style="padding:0 0 16px">Settings Change + Auto Re-index Flow</div>
+    <div class="mermaid">
+sequenceDiagram
+    participant U as User
+    participant SP as SettingsPanel
+    participant UMC as useMemoryCompanion
+    participant DB as IndexedDB
+    participant AI as AI Registry
+
+    U->>SP: Change API key or provider
+    SP->>UMC: updateSettings(nextSettings)
+    UMC->>DB: saveSettings(nextSettings)
+    UMC->>UMC: Detect key/provider change
+    alt key or provider changed
+        UMC->>UMC: setReindexing(true)
+        UMC->>AI: getAIRegistry(nextSettings)
+        loop For each active memory
+            AI->>AI: embeddingProvider.embed(canonicalText)
+            AI->>DB: Update memory_embeddings
+        end
+        UMC->>UMC: setReindexing(false)
+    end
+    UMC->>U: UI shows "Indexing…" → done
+    </div>
+  </div>
+</section>
+
+<!-- ── 6. DATABASE ── -->
+<section id="database">
+  <div class="section-header">
+    <div class="num">06 — Database</div>
+    <h2>IndexedDB Schema</h2>
+    <p>Dexie 4 manages schema version 2 with 6 tables. All data lives on-device.</p>
+  </div>
+  <div class="diagram-wrap" style="margin-bottom:24px">
+    <div class="mermaid">
+erDiagram
+    messages {
+        string id PK
+        string role
+        string modality
+        string content
+        string asset_id
+        string created_at
+    }
+    memory_items {
+        string id PK
+        string message_id
+        string memory_type
+        string canonical_text
+        string subject
+        float confidence
+        string source_kind
+        string superseded_by
+        string deleted_at
+        string created_at
+    }
+    memory_embeddings {
+        string memory_id PK
+        string embedding
+    }
+    assets {
+        string id PK
+        string kind
+        string mime_type
+        string created_at
+    }
+    settings {
+        string id PK
+        string updated_at
+    }
+    reminders {
+        string id PK
+        string memory_id
+        string remind_at
+        boolean fired
+    }
+
+    messages ||--o{ memory_items : "triggers"
+    memory_items ||--|| memory_embeddings : "has"
+    memory_items ||--o{ reminders : "schedules"
+    messages ||--o| assets : "attaches"
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Key Query Patterns</div>
+      <table class="data-table">
+        <thead><tr><th>Operation</th><th>Index Used</th></tr></thead>
+        <tbody>
+          <tr><td>List active memories</td><td><code>deleted_at</code> IS NULL</td></tr>
+          <tr><td>Embedding lookup</td><td><code>memory_id</code> PK</td></tr>
+          <tr><td>Pending reminders</td><td><code>fired + remind_at</code></td></tr>
+          <tr><td>Chat messages</td><td><code>created_at</code> ordered</td></tr>
+          <tr><td>Asset for message</td><td><code>id</code> FK from messages</td></tr>
+          <tr><td>Superseded chain</td><td><code>superseded_by</code> FK walk</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-title">Data Retention Policy</div>
+      <table class="data-table">
+        <thead><tr><th>Data Type</th><th>Retention</th></tr></thead>
+        <tbody>
+          <tr><td>Memory items</td><td>Forever (soft-delete)</td></tr>
+          <tr><td>Embeddings</td><td>With memory item</td></tr>
+          <tr><td>Chat messages</td><td>Until "Clear chat"</td></tr>
+          <tr><td>Raw media (blobs)</td><td>Configurable (default 7 days)</td></tr>
+          <tr><td>Settings</td><td>Forever (1 row)</td></tr>
+          <tr><td>Reminders</td><td>Until fired</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ── 7. VOICE INPUT ── -->
+<section id="voice">
+  <div class="section-header">
+    <div class="num">07 — Voice Input</div>
+    <h2>Dual Voice Input Architecture</h2>
+    <p>Two completely different paths depending on whether an OpenAI key is available.</p>
+  </div>
+  <div class="voice-paths-wrap">
+    <div class="voice-path vp-cloud">
+      <h3 style="color:var(--accent)">☁️ Cloud Path (OpenAI key present)</h3>
+      <ul>
+        <li>Hook: <code>useVoiceRecorder</code></li>
+        <li>MediaRecorder API (webm/opus/ogg/mp4)</li>
+        <li>Real-time audio level via AnalyserNode</li>
+        <li>Stop → Blob → FormData</li>
+        <li>POST to OpenAI /audio/transcriptions</li>
+        <li>Model: gpt-4o-mini-transcribe</li>
+        <li>Returns transcribed text → memory pipeline</li>
+      </ul>
+    </div>
+    <div class="voice-path vp-local">
+      <h3 style="color:var(--green)">🎤 OS Path (Anthropic-only)</h3>
+      <ul>
+        <li>Hook: <code>useSpeechRecognition</code></li>
+        <li>Web Speech API (SpeechRecognition)</li>
+        <li>Continuous mode + interim results</li>
+        <li>iOS: Safari native speech engine</li>
+        <li>Android: Google Speech Services</li>
+        <li>Desktop: OS speech recognition</li>
+        <li>Live transcript → memory pipeline</li>
+      </ul>
+    </div>
+  </div>
+  <div class="diagram-wrap" style="margin-top:24px">
+    <div class="mermaid">
+flowchart LR
+    MicBtn["🎙️ Mic Button\n(Composer)"]
+    MicBtn --> Check{openai_api_key\nset?}
+    Check -->|Yes| VR["useVoiceRecorder\nMediaRecorder API"]
+    Check -->|No| SR["useSpeechRecognition\nWeb Speech API"]
+    VR --> Blob["Audio Blob\n(webm/opus/mp4)"]
+    Blob --> Whisper["OpenAI Whisper API\ngpt-4o-mini-transcribe"]
+    Whisper --> Text["Transcribed Text"]
+    SR --> LiveText["Live Transcript\n(continuous)"]
+    LiveText --> Text
+    Text --> Pipeline["Memory Pipeline\n(extract → embed → save)"]
+    style Check fill:#1a1a26,stroke:#f59e0b,color:#e2e8f0
+    style Pipeline fill:#1a1a26,stroke:#10b981,color:#e2e8f0
+    </div>
+  </div>
+</section>
+
+<!-- ── 8. APP STARTUP ── -->
+<section>
+  <div class="section-header">
+    <div class="num">08 — Startup</div>
+    <h2>App Startup Sequence</h2>
+    <p>Every session runs through initialization, gate check, and lock check before rendering the main UI.</p>
+  </div>
+  <div class="diagram-wrap">
+    <div class="mermaid">
+sequenceDiagram
+    participant B as Browser
+    participant SW as Service Worker
+    participant App as App.tsx
+    participant UMC as useMemoryCompanion
+    participant DB as IndexedDB
+    participant RP as reminderService
+
+    B->>SW: Install / Activate (cache assets)
+    B->>App: React mount
+    App->>UMC: initialize()
+    UMC->>DB: loadSettings()
+    UMC->>DB: listMessages()
+    UMC->>DB: listMemoryItems()
+    DB-->>UMC: settings, messages, memories
+
+    alt No API key in settings
+        App->>B: Show setup / onboarding screen
+    else Lock enabled + no unlock
+        App->>B: Show LockScreen
+        B->>App: User enters passcode
+        App->>UMC: unlock(passcode)
+        UMC->>UMC: verifySecret(passcode, hash)
+    end
+
+    App->>RP: checkAndFirePendingReminders()
+    RP->>DB: getPendingReminders()
+    RP->>B: fire missed notifications
+
+    App->>B: Render main UI (chat / memories / settings)
+    </div>
+  </div>
+</section>
+
+<!-- ── 9. HOOKS MAP ── -->
+<section id="hooks">
+  <div class="section-header">
+    <div class="num">09 — Hooks</div>
+    <h2>Hooks Architecture</h2>
+    <p>Each hook has a single responsibility. Only <code>useMemoryCompanion</code> has service dependencies.</p>
+  </div>
+  <div class="grid-2">
+    <div class="hook-item">
+      <h4>useMemoryCompanion</h4>
+      <div class="hook-desc">Main orchestrator. Owns all app state. Calls every service layer. 230 lines.</div>
+      <div class="hook-exports">
+        <span class="hook-export">messages</span>
+        <span class="hook-export">memories</span>
+        <span class="hook-export">settings</span>
+        <span class="hook-export">activePanel</span>
+        <span class="hook-export">locked</span>
+        <span class="hook-export">busy</span>
+        <span class="hook-export">reindexing</span>
+        <span class="hook-export">submit()</span>
+        <span class="hook-export">updateSettings()</span>
+        <span class="hook-export">reindex()</span>
+        <span class="hook-export">removeMemory()</span>
+        <span class="hook-export">editMemory()</span>
+        <span class="hook-export">clearChat()</span>
+        <span class="hook-export">unlock()</span>
+        <span class="hook-export">setActivePanel()</span>
+      </div>
+    </div>
+    <div class="hook-item">
+      <h4>useVoiceRecorder</h4>
+      <div class="hook-desc">MediaRecorder wrapper for cloud transcription path. Returns audio blob on stop. 120 lines.</div>
+      <div class="hook-exports">
+        <span class="hook-export">isRecording</span>
+        <span class="hook-export">audioLevel</span>
+        <span class="hook-export">elapsed</span>
+        <span class="hook-export">startRecording()</span>
+        <span class="hook-export">stopRecording()</span>
+      </div>
+    </div>
+    <div class="hook-item">
+      <h4>useSpeechRecognition</h4>
+      <div class="hook-desc">Web Speech API wrapper for OS transcription path. Continuous recognition with interim results. 155 lines.</div>
+      <div class="hook-exports">
+        <span class="hook-export">transcript</span>
+        <span class="hook-export">isListening</span>
+        <span class="hook-export">error</span>
+        <span class="hook-export">supported</span>
+        <span class="hook-export">startListening()</span>
+        <span class="hook-export">stopListening()</span>
+      </div>
+    </div>
+    <div class="hook-item">
+      <h4>useRelatedMemory</h4>
+      <div class="hook-desc">Real-time similarity hints as user types. Debounced embed calls (1200ms cloud / 600ms local). 62 lines.</div>
+      <div class="hook-exports">
+        <span class="hook-export">relatedMemory</span>
+        <span class="hook-export">dismiss()</span>
+      </div>
+    </div>
+    <div class="hook-item">
+      <h4>useOnboarding</h4>
+      <div class="hook-desc">Shows 3-step onboarding overlay when both messages and memories are empty. 20 lines.</div>
+      <div class="hook-exports">
+        <span class="hook-export">showOnboarding</span>
+        <span class="hook-export">completeOnboarding()</span>
+      </div>
+    </div>
+    <div class="hook-item">
+      <h4>useTheme</h4>
+      <div class="hook-desc">Dark/light mode toggle persisted to localStorage. Syncs with system preference on first load. 28 lines.</div>
+      <div class="hook-exports">
+        <span class="hook-export">theme</span>
+        <span class="hook-export">toggleTheme()</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 10. SECURITY ── -->
+<section id="security">
+  <div class="section-header">
+    <div class="num">10 — Security</div>
+    <h2>Security Model</h2>
+    <p>Privacy-by-design: no server, no analytics, no tracking. API keys never leave the device except in direct calls to provider endpoints.</p>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Security Controls</div>
+      <div class="check-list">
+        <div class="check-item">
+          <div class="check-icon check-pass">✓</div>
+          <div>
+            <div class="check-title">API keys in IndexedDB only</div>
+            <div class="check-detail">Never in env vars, config files, or the JS bundle. Entered at runtime via Settings UI.</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-icon check-pass">✓</div>
+          <div>
+            <div class="check-title">Direct-to-provider API calls</div>
+            <div class="check-detail">Fetch calls go <em>browser → OpenAI/Anthropic</em>. Zero proxy, zero server log.</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-icon check-pass">✓</div>
+          <div>
+            <div class="check-title">PBKDF2 passcode hashing</div>
+            <div class="check-detail">Web Crypto API hashes passcode before storage. Constant-time verification. No plaintext.</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-icon check-pass">✓</div>
+          <div>
+            <div class="check-title">Raw media auto-deletion</div>
+            <div class="check-detail">Image and audio blobs purged after configurable retention period (default 7 days). Transcript text retained.</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-icon check-pass">✓</div>
+          <div>
+            <div class="check-title">Storage persistence API</div>
+            <div class="check-detail"><code>navigator.storage.persist()</code> requested on first launch to protect against browser eviction.</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-icon check-warn">!</div>
+          <div>
+            <div class="check-title">Data stored plaintext in IndexedDB</div>
+            <div class="check-detail">Passcode locks the UI but does not encrypt the DB. Physical device access = data access.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Threat Model Summary</div>
+      <table class="data-table">
+        <thead><tr><th>Threat</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Network interception of keys</td><td style="color:var(--green)">Mitigated — HTTPS + direct calls</td></tr>
+          <tr><td>Server-side data breach</td><td style="color:var(--green)">N/A — no server</td></tr>
+          <tr><td>Malicious JS in bundle</td><td style="color:var(--green)">Mitigated — open source, Vite build</td></tr>
+          <tr><td>Browser eviction of DB</td><td style="color:var(--green)">Mitigated — Storage persist API</td></tr>
+          <tr><td>Shoulder surfing</td><td style="color:var(--green)">Mitigated — Passcode lock</td></tr>
+          <tr><td>Physical device access</td><td style="color:var(--yellow)">Partial — UI locked, DB plaintext</td></tr>
+          <tr><td>iOS PWA deletion</td><td style="color:var(--red)">User risk — wipes all data</td></tr>
+          <tr><td>API key leakage via logs</td><td style="color:var(--green)">Mitigated — no server logs</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ── 11. ALGORITHMS ── -->
+<section>
+  <div class="section-header">
+    <div class="num">11 — Algorithms</div>
+    <h2>Key Algorithms</h2>
+    <p>Embedding, similarity, and reranking logic that powers memory retrieval.</p>
+  </div>
+  <div class="grid-2">
+    <div>
+      <div class="card-title" style="margin-bottom:12px">Local Embedding (n-gram hashing)</div>
+      <div class="algo-box">
+<span class="cmt">// 256-dimensional sparse vector</span>
+<span class="kw">function</span> <span class="fn">embed</span>(text) {
+  tokens = tokenize(text)  <span class="cmt">// lowercase, split</span>
+  stopwords = <span class="str">["the", "a", "is", "in"...]</span>
+
+  <span class="kw">for</span> token <span class="kw">in</span> tokens:
+    hash = fnv32(token) % <span class="num">256</span>
+    vec[hash] += <span class="num">2</span>  <span class="cmt">// token weight</span>
+
+  <span class="kw">for</span> trigram <span class="kw">in</span> ngrams(tokens, <span class="num">3</span>):
+    hash = fnv32(trigram) % <span class="num">256</span>
+    vec[hash] += <span class="num">1</span>  <span class="cmt">// 3-gram weight</span>
+
+  <span class="kw">for</span> fourgram <span class="kw">in</span> ngrams(tokens, <span class="num">4</span>):
+    hash = fnv32(fourgram) % <span class="num">256</span>
+    vec[hash] += <span class="num">1</span>  <span class="cmt">// 4-gram weight</span>
+
+  <span class="kw">return</span> l2_normalize(vec)  <span class="cmt">// unit vector</span>
+}
+      </div>
+    </div>
+    <div>
+      <div class="card-title" style="margin-bottom:12px">Retrieval Reranking</div>
+      <div class="algo-box">
+<span class="cmt">// Composite reranking score</span>
+<span class="kw">function</span> <span class="fn">rerank</span>(candidate, query) {
+  score = cosine(query_vec, mem_vec)  <span class="cmt">// semantic</span>
+
+  age = daysSince(candidate.created_at)
+  score += max(<span class="num">0</span>, (<span class="num">30</span> - age) / <span class="num">30</span> * <span class="num">0.2</span>)
+
+  score += candidate.confidence * <span class="num">0.15</span>
+
+  <span class="kw">if</span> (subjectMatch == <span class="str">"exact"</span>):
+    score += <span class="num">0.5</span>
+  <span class="kw">elif</span> (subjectMatch == <span class="str">"contains"</span>):
+    score += <span class="num">0.25</span>
+
+  <span class="kw">if</span> (inferredType == candidate.memory_type):
+    score += <span class="num">0.15</span>
+
+  <span class="kw">if</span> (candidate.superseded_by):
+    score -= <span class="num">0.25</span>
+
+  <span class="kw">return</span> score
+}
+
+<span class="cmt">// Select top-3 by final score</span>
+<span class="cmt">// Minimum semantic threshold: 0.02</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 12. TECH STACK ── -->
+<section>
+  <div class="section-header">
+    <div class="num">12 — Stack</div>
+    <h2>Technology Stack</h2>
+  </div>
+  <div class="card">
+    <table class="data-table">
+      <thead><tr><th>Layer</th><th>Technology</th><th>Version</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>UI Framework</td><td>React</td><td>19.2.4</td><td>Hooks-only, no class components</td></tr>
+        <tr><td>Language</td><td>TypeScript</td><td>5.9.3</td><td>Strict mode, full type coverage</td></tr>
+        <tr><td>Build</td><td>Vite</td><td>8.0.1</td><td>HMR dev, SPA production bundle</td></tr>
+        <tr><td>Styling</td><td>Tailwind CSS</td><td>4.2.2</td><td>v4 (CSS-first config)</td></tr>
+        <tr><td>DB ORM</td><td>Dexie</td><td>4.3.0</td><td>IndexedDB, schema v2, 6 tables</td></tr>
+        <tr><td>AI (OpenAI)</td><td>OpenAI REST API</td><td>v1</td><td>Embeddings, chat, vision, whisper</td></tr>
+        <tr><td>AI (Anthropic)</td><td>Anthropic REST API</td><td>2023-06-01</td><td>Messages endpoint, browser mode</td></tr>
+        <tr><td>Icons</td><td>Lucide React</td><td>latest</td><td>SVG icon set</td></tr>
+        <tr><td>UI Primitives</td><td>Radix UI</td><td>latest</td><td>Switch component only</td></tr>
+        <tr><td>Testing</td><td>Vitest</td><td>4.1.1</td><td>jsdom environment</td></tr>
+        <tr><td>Media</td><td>MediaRecorder API</td><td>—</td><td>Cloud voice path</td></tr>
+        <tr><td>Media (OS)</td><td>Web Speech API</td><td>—</td><td>Anthropic-only voice path</td></tr>
+        <tr><td>Crypto</td><td>Web Crypto API</td><td>—</td><td>PBKDF2 passcode hashing</td></tr>
+        <tr><td>PWA</td><td>Web App Manifest + SW</td><td>—</td><td>Cache-first service worker</td></tr>
+        <tr><td>Storage persist</td><td>Storage API</td><td>—</td><td>navigator.storage.persist()</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ── 13. SERVICE MAP ── -->
+<section>
+  <div class="section-header">
+    <div class="num">13 — Service Map</div>
+    <h2>Full Service Map</h2>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="service-group">
+        <div class="service-group-title">AI Services</div>
+        <div class="service-list">
+          <div class="service-item"><div class="service-dot" style="background:var(--accent)"></div><div class="service-name">registry.ts</div><div class="service-desc">Provider selection + auto-detect</div><div class="service-lines">72 lines</div></div>
+          <div class="service-item"><div class="service-dot" style="background:var(--accent)"></div><div class="service-name">openaiProvider.ts</div><div class="service-desc">5 OpenAI implementations</div><div class="service-lines">174 lines</div></div>
+          <div class="service-item"><div class="service-dot" style="background:var(--accent2)"></div><div class="service-name">anthropicProvider.ts</div><div class="service-desc">3 Anthropic implementations</div><div class="service-lines">142 lines</div></div>
+          <div class="service-item"><div class="service-dot" style="background:var(--green)"></div><div class="service-name">localHeuristicProvider.ts</div><div class="service-desc">n-gram embedding + query subject extraction</div><div class="service-lines">115 lines</div></div>
+          <div class="service-item"><div class="service-dot" style="background:var(--muted)"></div><div class="service-name">keyValidator.ts</div><div class="service-desc">Live API key test calls</div><div class="service-lines">~30 lines</div></div>
+          <div class="service-item"><div class="service-dot" style="background:var(--muted)"></div><div class="service-name">types.ts</div><div class="service-desc">Provider interfaces</div><div class="service-lines">29 lines</div></div>
+        </div>
+      </div>
+      <div class="service-group">
+        <div class="service-group-title">Memory Services</div>
+        <div class="service-list">
+          <div class="service-item"><div class="service-dot" style="background:var(--accent3)"></div><div class="service-name">extractor.ts</div><div class="service-desc">Multimodal → memory creation</div><div class="service-lines">86 lines</div></div>
+          <div class="service-item"><div class="service-dot" style="background:var(--accent3)"></div><div class="service-name">retrievalService.ts</div><div class="service-desc">RAG pipeline + reranking</div><div class="service-lines">135 lines</div></div>
+          <div class="service-item"><div class="service-dot" style="background:var(--accent3)"></div><div class="service-name">duplicateDetector.ts</div><div class="service-desc">0.82 cosine threshold check</div><div class="service-lines">26 lines</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="service-group">
+        <div class="service-group-title">Storage Services</div>
+        <div class="service-list">
+          <div class="service-item"><div class="service-dot" style="background:var(--green)"></div><div class="service-name">database.ts</div><div class="service-desc">Dexie schema + defaults</div><div class="service-lines">52 lines</div></div>
+          <div class="service-item"><div class="service-dot" style="background:var(--green)"></div><div class="service-name">localRepository.ts</div><div class="service-desc">CRUD + transactions + import/export</div><div class="service-lines">208 lines</div></div>
+          <div class="service-item"><div class="service-dot" style="background:var(--green)"></div><div class="service-name">migrationService.ts</div><div class="service-desc">Schema migrations + reindex all</div><div class="service-lines">45 lines</div></div>
+        </div>
+      </div>
+      <div class="service-group">
+        <div class="service-group-title">Privacy + Utils</div>
+        <div class="service-list">
+          <div class="service-item"><div class="service-dot" style="background:var(--yellow)"></div><div class="service-name">privacyService.ts</div><div class="service-desc">Export / import / wipe / passcode</div><div class="service-lines">58 lines</div></div>
+          <div class="service-item"><div class="service-dot" style="background:var(--muted)"></div><div class="service-name">utils/crypto.ts</div><div class="service-desc">PBKDF2 hash + verify</div><div class="service-lines">18 lines</div></div>
+          <div class="service-item"><div class="service-dot" style="background:var(--muted)"></div><div class="service-name">utils/ids.ts</div><div class="service-desc">Prefixed unique ID gen</div><div class="service-lines">4 lines</div></div>
+          <div class="service-item"><div class="service-dot" style="background:var(--muted)"></div><div class="service-name">utils/notifications.ts</div><div class="service-desc">Browser notification API</div><div class="service-lines">17 lines</div></div>
+          <div class="service-item"><div class="service-dot" style="background:var(--muted)"></div><div class="service-name">utils/date.ts</div><div class="service-desc">Relative + locale date formatting</div><div class="service-lines">127 lines</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 14. RESPONSIVE LAYOUT ── -->
+<section>
+  <div class="section-header">
+    <div class="num">14 — Layout</div>
+    <h2>Responsive Layout</h2>
+    <p>Single breakpoint at <code>lg</code> (1024px). Mobile-first with iOS-safe-area support.</p>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Mobile Layout (< 1024px)</div>
+      <div style="background:var(--code-bg);border-radius:10px;padding:16px;font-family:monospace;font-size:12px;color:#94a3b8;line-height:1.8">
+┌────────────────────────┐<br>
+│ ← Header  ☀️  ⟳  [Re] │ ← header bar<br>
+├────────────────────────┤<br>
+│                        │<br>
+│   Active Panel         │ ← scrollable<br>
+│   (Chat/Memories/      │<br>
+│    Privacy/Settings)   │<br>
+│                        │<br>
+├────────────────────────┤<br>
+│  Composer (pinned)     │ ← fixed bottom<br>
+├────────────────────────┤<br>
+│ 💬  📚  🔒  ⚙️         │ ← TabBar<br>
+└────────────────────────┘
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Desktop Layout (≥ 1024px)</div>
+      <div style="background:var(--code-bg);border-radius:10px;padding:16px;font-family:monospace;font-size:12px;color:#94a3b8;line-height:1.8">
+┌────────┬─────────────────────┐<br>
+│Sidebar │ Title bar           │<br>
+│        ├─────────────────────┤<br>
+│ 💬 Chat│                     │<br>
+│ 📚 Mem │  Active Panel       │<br>
+│ 🔒 Priv│  (2/3 width)        │<br>
+│ ⚙️ Set │                     │<br>
+│        ├─────────────────────┤<br>
+│ [Ham]  │  Composer (pinned)  │<br>
+└────────┴─────────────────────┘
+      </div>
+    </div>
+  </div>
+</section>
+
+</div><!-- /page -->
+
+<footer>
+  MeCo.AI — Architecture Document &nbsp;·&nbsp; Generated 2026-03-25 &nbsp;·&nbsp; React 19 + TypeScript + Dexie 4 + OpenAI/Anthropic
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      background: '#12121a',
+      primaryColor: '#1a1a26',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#2a2a3e',
+      lineColor: '#4b5563',
+      secondaryColor: '#1a1a26',
+      tertiaryColor: '#12121a',
+      edgeLabelBackground: '#1a1a26',
+      clusterBkg: '#12121a',
+      titleColor: '#e2e8f0',
+      nodeTextColor: '#e2e8f0',
+      fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif',
+    },
+    flowchart: { curve: 'basis', htmlLabels: true },
+    sequence: { actorMargin: 60, messageMargin: 20 },
+    er: { layoutDirection: 'TB' }
+  });
+</script>
+</body>
+</html>

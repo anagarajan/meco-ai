@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <rect width="192" height="192" fill="#5856D6"/>
+  <ellipse cx="80" cy="90" rx="25" ry="32" fill="white"/>
+  <ellipse cx="112" cy="90" rx="25" ry="32" fill="rgba(255,255,255,0.8)"/>
+  <rect x="94" y="58" width="4" height="64" fill="#5856D6"/>
+  <rect x="85" y="119" width="22" height="12" rx="4" fill="white"/>
+  <line x1="55" y1="78" x2="43" y2="75" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="39" cy="74" r="5" fill="white"/>
+  <line x1="55" y1="102" x2="43" y2="105" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="39" cy="106" r="5" fill="white"/>
+  <line x1="137" y1="78" x2="149" y2="75" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="153" cy="74" r="5" fill="white"/>
+  <line x1="137" y1="102" x2="149" y2="105" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="153" cy="106" r="5" fill="white"/>
+</svg>

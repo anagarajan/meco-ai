@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <!-- Full bleed: no rounded corners, Android applies its own adaptive mask -->
+  <rect width="192" height="192" fill="#5856D6"/>
+  <!-- Brain content within safe zone (inner 80%, ~19px inset each side) -->
+  <ellipse cx="82" cy="93" rx="22" ry="28" fill="white"/>
+  <ellipse cx="110" cy="93" rx="22" ry="28" fill="rgba(255,255,255,0.8)"/>
+  <rect x="95" y="65" width="4" height="56" fill="#5856D6"/>
+  <rect x="87" y="118" width="18" height="10" rx="3" fill="white"/>
+  <line x1="60" y1="82" x2="50" y2="80" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="46" cy="79" r="4" fill="white"/>
+  <line x1="60" y1="104" x2="50" y2="106" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="46" cy="107" r="4" fill="white"/>
+  <line x1="132" y1="82" x2="142" y2="80" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="146" cy="79" r="4" fill="white"/>
+  <line x1="132" y1="104" x2="142" y2="106" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="146" cy="107" r="4" fill="white"/>
+</svg>
