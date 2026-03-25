@@ -1,4 +1,8 @@
-const CACHE_NAME = "memory-companion-v2";
+// __BUILD_TIMESTAMP__ is replaced with a unix timestamp at build time by the
+// Vite stamp-sw plugin. This makes the SW file byte-different on every deploy,
+// so the browser detects the update automatically.
+const CACHE_NAME = "meco-ai-__BUILD_TIMESTAMP__";
+
 const APP_SHELL = [
   "/",
   "/manifest.json",
@@ -10,7 +14,8 @@ const APP_SHELL = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
-  self.skipWaiting();
+  // Do NOT call skipWaiting() here. The app controls activation via SKIP_WAITING
+  // so the user sees the "Update available" banner before the page reloads.
 });
 
 self.addEventListener("activate", (event) => {
@@ -22,9 +27,27 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+// App posts { type: "SKIP_WAITING" } when the user taps "Update now".
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
+  // Navigation requests (HTML) — network first so the app always loads the
+  // latest index.html on open. Falls back to cached shell if offline.
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match("/")),
+    );
+    return;
+  }
+
+  // Static assets (JS/CSS/icons) — cache first. Vite content-hashes these
+  // filenames so stale entries are never served for updated code.
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) return cachedResponse;

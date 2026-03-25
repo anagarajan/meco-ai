@@ -1,4 +1,5 @@
-import { Moon, Sun, Trash2, Key, RefreshCw } from "lucide-react";
+import { Moon, Sun, Trash2, Key, RefreshCw, Download } from "lucide-react";
+import { useState, useEffect } from "react";
 import { Composer } from "../components/chat/Composer";
 import { Conversation } from "../components/chat/Conversation";
 import { LockScreen } from "../components/layout/LockScreen";
@@ -34,6 +35,21 @@ export function App() {
 
   const { theme, toggle: toggleTheme } = useTheme();
   const { showOnboarding, dismiss: dismissOnboarding } = useOnboarding(memories.length, messages.length);
+
+  const [updateWorker, setUpdateWorker] = useState<ServiceWorker | null>(null);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      setUpdateWorker((e as CustomEvent<ServiceWorker>).detail);
+    };
+    window.addEventListener("meco-update-ready", handler);
+    return () => window.removeEventListener("meco-update-ready", handler);
+  }, []);
+
+  function applyUpdate() {
+    updateWorker?.postMessage({ type: "SKIP_WAITING" });
+    // page reloads via the controllerchange listener in main.tsx
+  }
 
   if (!settings) {
     return (
@@ -101,6 +117,23 @@ export function App() {
   return (
     <div className="min-h-screen bg-ios-bg font-sans">
       {locked ? <LockScreen onUnlock={unlock} /> : null}
+
+      {/* ── Update banner ───────────────────────────────────────────── */}
+      {updateWorker && (
+        <div className="fixed top-0 inset-x-0 z-50 flex items-center justify-between gap-3 px-4 py-2.5 bg-ios-purple text-white text-[13px] font-medium shadow-lg" style={{ paddingTop: "calc(env(safe-area-inset-top) + 10px)" }}>
+          <div className="flex items-center gap-2">
+            <Download size={14} />
+            <span>New version available</span>
+          </div>
+          <button
+            type="button"
+            onClick={applyUpdate}
+            className="px-3 py-1 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-[12px] font-semibold border-0 shrink-0"
+          >
+            Update now
+          </button>
+        </div>
+      )}
 
       {/* ── Mobile layout (< lg) ────────────────────────────────────── */}
       <div className="h-screen flex flex-col overflow-hidden lg:hidden">
