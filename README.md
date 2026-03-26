@@ -261,3 +261,127 @@ public/
 ├── manifest.json           PWA manifest
 └── sw.js                   Service worker (static asset caching)
 ```
+
+---
+
+## How RAG and Embeddings Work
+
+### The Problem
+
+MeCo.AI stores hundreds of memories. When you ask a question, it can't send all of them to the AI — too expensive, too slow, exceeds context limits. It needs to find the 2–3 most relevant ones first. This is what RAG solves.
+
+### What is an Embedding?
+
+An embedding converts text into a list of numbers (a vector). The key property: **similar meaning → similar numbers**.
+
+```
+"my passport is in the drawer"   → [0.12, -0.34, 0.89, 0.02, ...]  1536 numbers
+"passport stored in blue drawer" → [0.11, -0.31, 0.91, 0.03, ...]  very similar!
+"I love pizza"                   → [0.67,  0.82, -0.12, 0.55, ...]  very different
+```
+
+Think of it as a location in space. Similar sentences live near each other. Unrelated sentences live far apart.
+
+### Cosine Similarity
+
+To compare two vectors, MeCo.AI uses cosine similarity — it measures the angle between them.
+
+```
+cosine(A, B) = (A · B) / (|A| × |B|)
+```
+
+| Score | Meaning |
+|---|---|
+| 1.0 | Identical meaning |
+| 0.7–0.9 | Strongly related |
+| 0.3–0.5 | Somewhat related |
+| 0.0 | Completely unrelated |
+
+Cosine is used instead of regular distance because it ignores vector length — only direction matters. So "passport" and "my passport is definitely in the drawer somewhere" score similarly even though one is much longer.
+
+### Two Embedding Strategies
+
+**OpenAI (when OpenAI key is set)**
+
+Text is sent to `text-embedding-3-small` and returns 1536 numbers trained on billions of sentences. Understands synonyms and semantic relationships.
+
+**Local n-gram hashing (Anthropic-only path)**
+
+No API call — pure math in the browser. Produces a 256-dimensional vector:
+
+1. Tokenise the text into words
+2. Hash each token into a 256-slot bucket, weighted 2×
+3. Hash overlapping 3-word and 4-word groups (n-grams), weighted 1× each
+4. L2-normalise to a unit vector
+
+N-grams preserve word order — "keys in kitchen" and "kitchen in keys" produce different 3-gram hashes even though they share the same tokens.
+
+### The Full RAG Pipeline
+
+```
+── SAVE TIME ──────────────────────────────────────────────
+
+"Remember my passport is in the safe"
+        │
+        ▼
+embed("passport is in the safe") → [0.12, -0.34, 0.89 ...]
+        │
+        ▼
+stored in memory_embeddings table (IndexedDB)
+
+
+── QUERY TIME ─────────────────────────────────────────────
+
+"Where is my passport?"
+        │
+        ▼
+embed("Where is my passport?") → [0.11, -0.31, 0.91 ...]
+        │                          same vector space
+        ▼
+cosine similarity against ALL stored embeddings
+        │
+        ▼
+top matches → rerank → send top 3 to AI as context
+        │
+        ▼
+AI reasons: "Your passport is in the safe"
+```
+
+The query and memories must use the same embedding model so they live in the same vector space. Switching providers triggers a full re-index.
+
+### Reranking
+
+Raw cosine score alone isn't enough. A memory from 3 years ago might score 0.85 while a correct memory from today scores 0.75. MeCo.AI applies a composite reranking formula:
+
+```
+final_score
+  = semantic_score           ← cosine similarity (base)
+  + age_boost                ← recent memories score higher
+  + confidence × 0.15        ← AI extraction confidence
+  + 0.50 (exact subject)     ← "passport" matches "passport"
+  + 0.25 (partial subject)   ← subject is contained in memory
+  + 0.15 (type match)        ← inferred query type matches memory type
+  - 0.25 (superseded)        ← stale memories penalised
+```
+
+Top 3 candidates by final score are sent to the AI as context.
+
+### Duplicate Detection
+
+When saving a new memory, MeCo.AI checks cosine similarity against all existing memories. If any score exceeds **0.82**, the user is warned about the similar existing memory. The threshold is tuned to avoid false positives (0.5 would flag "I like tea" vs "I like coffee") while catching real duplicates with slightly different wording.
+
+### Smart Context Chip
+
+As you type in the composer, the app embeds your partial text in real time (debounced 1200ms) and surfaces the closest matching memory as a hint chip. Same pipeline as retrieval, triggered live via `useRelatedMemory`.
+
+### Key Lookup Table
+
+| Concept | What it does | Source file |
+|---|---|---|
+| Embedding | Text → vector | `openaiProvider.ts`, `localHeuristicProvider.ts` |
+| Cosine similarity | Vector → score 0–1 | `retrievalService.ts` |
+| N-gram hashing | Local embedding, no API | `localHeuristicProvider.ts` |
+| RAG retrieval | Find top-3 for a query | `retrievalService.ts` |
+| Reranking | Age + confidence + subject boost | `retrievalService.ts` |
+| Duplicate detection | Block saves above 0.82 | `duplicateDetector.ts` |
+| Live context chip | Embed while typing | `useRelatedMemory.ts` |
