@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { ShieldCheck, Download, Upload, Trash2, Cloud, CloudOff, TriangleAlert, HardDrive, ShieldAlert } from "lucide-react";
+import { ShieldCheck, Download, Upload, Trash2, Cloud, CloudOff, TriangleAlert, HardDrive, ShieldAlert, FileText } from "lucide-react";
 import type { AppSettings } from "../../types/domain";
 import { downloadExport, importFromFile, wipeDeviceData, getStorageEstimate, type StorageEstimate } from "../../services/privacy/privacyService";
 import { cn } from "@/lib/utils";
@@ -227,6 +227,22 @@ export function PrivacyPanel({ settings, onAfterWipe }: PrivacyPanelProps) {
           <Trash2 size={18} className="text-ios-red shrink-0" />
           <span className="text-[17px] text-ios-red flex-1">Wipe this device</span>
         </button>
+      </div>
+
+      {/* Privacy Policy link */}
+      <p className="text-[13px] font-semibold text-ios-gray-1 uppercase tracking-wide px-1 mb-2 mt-6">
+        Legal
+      </p>
+      <div className="rounded-ios-xl overflow-hidden border border-ios-sep bg-ios-surface">
+        <a
+          href="/privacy-policy.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full flex items-center gap-3 px-4 py-3 text-left bg-transparent no-underline hover:bg-ios-gray-6/50 transition-colors"
+        >
+          <FileText size={18} className="text-ios-purple shrink-0" />
+          <span className="text-[17px] text-ios-purple flex-1">Privacy Policy</span>
+        </a>
       </div>
     </div>
   );
