@@ -141,8 +141,19 @@ export class OpenAITranscriptionProvider implements TranscriptionProvider {
     const apiKey = settings.openai_api_key;
     if (!apiKey) throw new Error("Missing OpenAI API key");
 
+    // Derive file extension from the blob's mime type so OpenAI accepts it.
+    // iOS WKWebView produces audio/mp4, desktop Chrome produces audio/webm.
+    const mimeToExt: Record<string, string> = {
+      "audio/mp4": "m4a",
+      "audio/webm": "webm",
+      "audio/webm;codecs=opus": "webm",
+      "audio/ogg;codecs=opus": "ogg",
+      "audio/ogg": "ogg",
+    };
+    const ext = mimeToExt[blob.type] ?? "webm";
+
     const formData = new FormData();
-    formData.append("file", blob, "voice.webm");
+    formData.append("file", blob, `voice.${ext}`);
     formData.append("model", settings.openai_transcription_model ?? "gpt-4o-mini-transcribe");
 
     const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
