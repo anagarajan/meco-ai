@@ -99,7 +99,7 @@ export async function clearChatMessages(): Promise<void> {
 }
 
 export async function wipeAllData(): Promise<void> {
-  await db.transaction("rw", db.messages, db.memory_items, db.memory_embeddings, db.assets, db.reminders, async () => {
+  await db.transaction("rw", [db.messages, db.memory_items, db.memory_embeddings, db.assets, db.reminders], async () => {
     await db.messages.clear();
     await db.memory_items.clear();
     await db.memory_embeddings.clear();
@@ -243,4 +243,3 @@ export async function sweepRawMedia(retentionDays: number): Promise<void> {
     }
   });
 }
-
