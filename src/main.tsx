@@ -28,6 +28,20 @@ if ("serviceWorker" in navigator) {
             }
           });
         });
+
+        // On mobile PWAs the page stays alive in memory when backgrounded.
+        // The "load" event never fires again on re-open, so we must explicitly
+        // poll for a new SW whenever the app becomes visible.
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible") {
+            registration.update().catch(() => undefined);
+            // If a SW finished installing while we were in the background,
+            // it will already be in "waiting" — notify immediately.
+            if (registration.waiting) {
+              notifyWaiting(registration.waiting);
+            }
+          }
+        });
       })
       .catch(() => {
         // Silently ignore SW registration errors

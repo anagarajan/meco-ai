@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultSettings } from "../src/db/database";
+import { defaultSettings } from "../src/services/storage/database";
 import {
   LocalEmbeddingProvider,
   extractQuerySubject,
   extractSubject,
 } from "../src/services/ai/localHeuristicProvider";
-import { rerank } from "../src/services/retrieval/retrievalService";
+import { rerank } from "../src/services/memory/retrievalService";
 
 describe("LocalEmbeddingProvider", () => {
   it("keeps similar objects closer than unrelated ones", async () => {

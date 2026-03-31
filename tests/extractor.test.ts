@@ -10,4 +10,3 @@ describe("LocalMemoryExtractionProvider", () => {
     expect(result.payload.subject).toBe("passport");
   });
 });
-

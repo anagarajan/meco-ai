@@ -16,7 +16,10 @@
       "Bash(npm --version)",
       "Bash(git --version)",
       "Bash(git push:*)",
-      "Bash(vercel:*)"
+      "Bash(vercel:*)",
+      "Bash(wc -l /Users/ashwinkumarnagarajan/AI-Memory-Companion/src/services/ai/*.ts /Users/ashwinkumarnagarajan/AI-Memory-Companion/src/services/memory/*.ts /Users/ashwinkumarnagarajan/AI-Memory-Companion/src/services/storage/*.ts)",
+      "Bash(npx tsc:*)",
+      "Bash(git stash:*)"
     ]
   }
 }

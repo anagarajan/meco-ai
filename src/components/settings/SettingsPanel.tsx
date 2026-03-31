@@ -233,9 +233,9 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
         </div>
       </SettingsGroup>
 
-      {/* Anthropic */}
-      <SectionHeader title="Anthropic (Claude)" />
-      <SettingsGroup>
+      {/* Anthropic — only shown when Claude is the selected provider */}
+      {settings.default_ai_provider === "anthropic" && <SectionHeader title="Anthropic (Claude)" />}
+      {settings.default_ai_provider === "anthropic" && <SettingsGroup>
         <div className="px-4 py-3 space-y-3">
           <div>
             <p className="text-[15px] text-ios-label mb-1.5">API Key</p>
@@ -281,7 +281,7 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
             Claude handles reasoning, memory extraction, and image understanding. Embeddings use a local n-gram engine (no API call needed). Audio transcription uses OpenAI Whisper if an OpenAI key is also configured.
           </p>
         </div>
-      </SettingsGroup>
+      </SettingsGroup>}
 
       {/* Privacy */}
       <SectionHeader title="Privacy" />

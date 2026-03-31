@@ -1,4 +1,13 @@
+import { Capacitor } from "@capacitor/core";
+
+const isNative = Capacitor.isNativePlatform();
+
 export async function requestNotificationPermission(): Promise<boolean> {
+  if (isNative) {
+    // On native Capacitor, @capacitor/local-notifications handles permissions.
+    // For now, fall through to Web Notifications API which works in WKWebView.
+    // TODO: Install @capacitor/local-notifications for reliable native scheduling.
+  }
   if (!("Notification" in window)) return false;
   if (Notification.permission === "granted") return true;
   if (Notification.permission === "denied") return false;

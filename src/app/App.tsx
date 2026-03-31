@@ -4,6 +4,10 @@ import { Composer } from "../components/chat/Composer";
 import { Conversation } from "../components/chat/Conversation";
 import { LockScreen } from "../components/layout/LockScreen";
 import { MemoryLedger } from "../components/memory/MemoryLedger";
+import { MemoryTimeline } from "../components/memory/MemoryTimeline";
+import { MemoryViewToggle, type MemoryView } from "../components/memory/MemoryViewToggle";
+import { AISuggestionBanner } from "../components/reminders/AISuggestionBanner";
+import { ReminderManager } from "../components/reminders/ReminderManager";
 import { OnboardingOverlay } from "../components/onboarding/OnboardingOverlay";
 import { PrivacyPanel } from "../components/settings/PrivacyPanel";
 import { SettingsPanel } from "../components/settings/SettingsPanel";
@@ -15,15 +19,18 @@ import { useTheme } from "../hooks/useTheme";
 
 export function App() {
   const {
+    acceptReminderSuggestion,
     activePanel,
     busy,
     clearChat,
+    dismissReminderSuggestion,
     editMemory,
     locked,
     memories,
     messages,
     reindex,
     reindexing,
+    reminderSuggestion,
     removeMemory,
     settings,
     setActivePanel,
@@ -35,6 +42,15 @@ export function App() {
 
   const { theme, toggle: toggleTheme } = useTheme();
   const { showOnboarding, dismiss: dismissOnboarding } = useOnboarding(memories.length, messages.length);
+
+  const [memoryView, setMemoryView] = useState<MemoryView>(
+    () => (localStorage.getItem("meco-memory-view") as MemoryView) || "list",
+  );
+
+  function handleMemoryViewChange(view: MemoryView) {
+    setMemoryView(view);
+    localStorage.setItem("meco-memory-view", view);
+  }
 
   const [updateWorker, setUpdateWorker] = useState<ServiceWorker | null>(null);
 
@@ -194,8 +210,16 @@ export function App() {
                 <Conversation messages={messages} />
                 {showOnboarding && <OnboardingOverlay onDismiss={dismissOnboarding} />}
               </div>
-              {/* Composer pinned above the tab bar */}
+              {/* Reminder suggestion + Composer pinned above the tab bar */}
               <div className="shrink-0 bg-ios-surface/80 backdrop-blur-[20px] border-t border-ios-sep pb-tab-bar">
+                {reminderSuggestion && (
+                  <AISuggestionBanner
+                    suggestion={reminderSuggestion.suggestion}
+                    memoryId={reminderSuggestion.memoryId}
+                    onAccept={acceptReminderSuggestion}
+                    onDismiss={dismissReminderSuggestion}
+                  />
+                )}
                 <Composer busy={busy} settings={settings} onSubmit={submit} useCloudTranscription={useCloudTranscription} />
               </div>
             </>
@@ -203,7 +227,14 @@ export function App() {
           {activePanel !== "chat" && (
             <div className="flex-1 overflow-y-auto pb-tab-bar">
               {activePanel === "memories" && (
-                <MemoryLedger memories={memories} onDelete={removeMemory} onEdit={editMemory} />
+                <>
+                  <div className="flex justify-center pt-3 pb-1">
+                    <MemoryViewToggle value={memoryView} onChange={handleMemoryViewChange} />
+                  </div>
+                  {memoryView === "list" && <MemoryLedger memories={memories} onDelete={removeMemory} onEdit={editMemory} />}
+                  {memoryView === "timeline" && <MemoryTimeline memories={memories} onDelete={removeMemory} onEdit={editMemory} />}
+                  {memoryView === "reminders" && <ReminderManager memories={memories} />}
+                </>
               )}
               {activePanel === "privacy" && (
                 <PrivacyPanel settings={settings} onAfterWipe={refresh} />
@@ -270,13 +301,26 @@ export function App() {
                   {showOnboarding && <OnboardingOverlay onDismiss={dismissOnboarding} />}
                 </div>
                 <div className="border-t border-ios-sep bg-ios-surface/60 backdrop-blur-sm shrink-0">
+                  {reminderSuggestion && (
+                    <AISuggestionBanner
+                      suggestion={reminderSuggestion.suggestion}
+                      memoryId={reminderSuggestion.memoryId}
+                      onAccept={acceptReminderSuggestion}
+                      onDismiss={dismissReminderSuggestion}
+                    />
+                  )}
                   <Composer busy={busy} settings={settings} onSubmit={submit} useCloudTranscription={useCloudTranscription} />
                 </div>
               </div>
             )}
             {activePanel === "memories" && (
               <div className="overflow-y-auto h-full p-4">
-                <MemoryLedger memories={memories} onDelete={removeMemory} onEdit={editMemory} />
+                <div className="flex justify-center pb-2">
+                  <MemoryViewToggle value={memoryView} onChange={handleMemoryViewChange} />
+                </div>
+                {memoryView === "list"
+                  ? <MemoryLedger memories={memories} onDelete={removeMemory} onEdit={editMemory} />
+                  : <MemoryTimeline memories={memories} onDelete={removeMemory} onEdit={editMemory} />}
               </div>
             )}
             {activePanel === "privacy" && (

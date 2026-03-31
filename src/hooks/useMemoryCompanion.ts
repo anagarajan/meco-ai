@@ -5,7 +5,8 @@ import { verifySecret } from "../utils/crypto";
 import { getAIRegistry } from "../services/ai/registry";
 import { answerMemoryQuestion } from "../services/memory/retrievalService";
 import { maybeCreateMemory } from "../services/memory/extractor";
-import { checkAndFirePendingReminders } from "../services/reminders/reminderService";
+import { checkAndFirePendingReminders, scheduleMemoryReminder } from "../services/reminders/reminderService";
+import { detectReminderOpportunity, type ReminderSuggestion } from "../services/reminders/smartReminderDetector";
 import {
   clearChatMessages,
   createMessage,
@@ -35,6 +36,7 @@ export function useMemoryCompanion() {
   const [locked, setLocked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [reindexing, setReindexing] = useState(false);
+  const [reminderSuggestion, setReminderSuggestion] = useState<{ memoryId: string; suggestion: ReminderSuggestion } | null>(null);
 
   async function refresh() {
     let nextSettings = await ensureSettings();
@@ -123,6 +125,17 @@ export function useMemoryCompanion() {
         }
 
         await createMessage({ role: "assistant", modality: "text", text_content: reply });
+
+        // Check saved memories for reminder opportunities
+        if (results && results.length > 0) {
+          for (const { memory } of results) {
+            const opportunity = detectReminderOpportunity(memory.canonical_text, memory.memory_type);
+            if (opportunity) {
+              setReminderSuggestion({ memoryId: memory.id, suggestion: opportunity });
+              break; // show at most one suggestion per save
+            }
+          }
+        }
       } else {
         const effectiveQuestion =
           payload.text ||
@@ -206,6 +219,20 @@ export function useMemoryCompanion() {
     setMessages([]);
   }
 
+  async function acceptReminderSuggestion(memoryId: string, suggestion: ReminderSuggestion): Promise<void> {
+    await scheduleMemoryReminder(memoryId, suggestion.suggestedDate, suggestion.label, {
+      recurrence: suggestion.recurrence,
+      aiSuggested: true,
+    });
+    setReminderSuggestion(null);
+    await createMessage({ role: "assistant", modality: "text", text_content: "Reminder set." });
+    await refresh();
+  }
+
+  function dismissReminderSuggestion(): void {
+    setReminderSuggestion(null);
+  }
+
   async function unlock(passcode: string): Promise<boolean> {
     const ok = await verifySecret(passcode, settings?.passcode_hash);
     if (ok) setLocked(false);
@@ -213,15 +240,18 @@ export function useMemoryCompanion() {
   }
 
   return {
+    acceptReminderSuggestion,
     activePanel,
     busy,
     clearChat,
+    dismissReminderSuggestion,
     editMemory,
     locked,
     memories,
     messages,
     reindex,
     reindexing,
+    reminderSuggestion,
     settings,
     setActivePanel,
     removeMemory,

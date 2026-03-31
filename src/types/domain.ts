@@ -77,11 +77,25 @@ export interface SourceRecord {
   mediaKind?: "image" | "audio";
 }
 
+export type RecurrencePattern = "daily" | "weekly" | "monthly" | "custom";
+
+export interface RecurrenceRule {
+  pattern: RecurrencePattern;
+  interval?: number;   // for "custom": every N days
+  end_date?: string;   // optional ISO date string
+}
+
 export interface Reminder {
   id: string;
   memory_id: string;
-  remind_at: string; // ISO date string
+  label: string;
+  remind_at: string;          // ISO date string — next fire time
   fired: boolean;
+  active: boolean;
+  recurrence?: RecurrenceRule;
+  snoozed_until?: string;     // ISO date string
+  last_fired_at?: string;     // ISO date string
+  ai_suggested: boolean;
   created_at: string;
 }
 

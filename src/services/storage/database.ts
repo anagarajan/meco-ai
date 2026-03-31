@@ -29,6 +29,21 @@ export class MemoryCompanionDatabase extends Dexie {
       assets: "id, kind, created_at",
       reminders: "id, memory_id, remind_at, fired",
     });
+
+    this.version(3).stores({
+      messages: "id, role, modality, created_at",
+      memory_items: "id, message_id, memory_type, created_at, superseded_by, deleted_at",
+      memory_embeddings: "memory_id",
+      settings: "id, updated_at",
+      assets: "id, kind, created_at",
+      reminders: "id, memory_id, remind_at, fired, active",
+    }).upgrade((tx) =>
+      tx.table("reminders").toCollection().modify((reminder) => {
+        reminder.label = reminder.label ?? "";
+        reminder.active = reminder.active ?? true;
+        reminder.ai_suggested = reminder.ai_suggested ?? false;
+      })
+    );
   }
 }
 

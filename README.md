@@ -111,6 +111,8 @@ Where did I park?
 - **Ask mode** — searches your memories and answers using RAG
 - **Memories tab** — browse, search, filter by type, edit, or delete saved memories
 
+> **Image size note:** Phone camera photos (typically 3–10 MB) are supported. The image is encoded to base64 in the browser before being sent to the AI provider — this may take 1–2 seconds for large photos on older devices. If you see a "maximum call stack size exceeded" error on image save, you are running an older build; update to the latest version.
+
 ---
 
 ## Data & storage

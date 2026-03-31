@@ -111,5 +111,70 @@ export function extractQuerySubject(text: string): string | undefined {
   return undefined;
 }
 
+// ─── Memory Subject Extraction ───────────────────────────────────────────────
+// Extracts the subject from a memory statement text based on memory type.
+// Used for subject-aware retrieval boosting.
+
+export function extractSubject(text: string, memoryType: MemoryType): string | undefined {
+  // Strip common memory-saving prefixes
+  const s = text.toLowerCase().trim()
+    .replace(/^(please\s+)?(remember|save|note)( that)?\s*/i, "")
+    .replace(/^(don'?t forget|keep in mind|please note|please remember|please save)( that)?\s*/i, "")
+    .replace(/^my\s+/, "")
+    .trim();
+
+  if (memoryType === "object_location") {
+    // "car key is in first drawer" → "car key"
+    const match = s.match(/^(.+?)\s+(?:is|are)\s+(?:in|on|at|under|behind|near|inside|next to)\b/);
+    if (match?.[1]) return normalizeSubject(match[1]);
+  }
+
+  if (memoryType === "person_fact") {
+    // "Sarah likes chocolate" → "sarah"
+    const match = s.match(/^([a-z][a-z ]{0,25}?)\s+(?:likes?|prefers?|hates?|loves?|is|works?|lives?)\b/);
+    if (match?.[1]) return normalizeSubject(match[1]);
+  }
+
+  // Generic: first content word(s) before a verb
+  const generic = s.match(/^(.+?)\s+(?:is|are|was|were|has|have|will|should|must)\b/);
+  if (generic?.[1]) return normalizeSubject(generic[1]);
+
+  return undefined;
+}
+
+// ─── Local Memory Extraction Provider ────────────────────────────────────────
+// Rule-based memory extraction that works without any API key.
+
+import type { ExtractionResult, MemoryExtractionProvider } from "./types";
+
+const TYPE_PATTERNS: [MemoryType, RegExp][] = [
+  ["object_location", /\b(?:is in|are in|is on|is at|is under|is behind|is near|is inside|left in|left at|stored in|put in|keep in|kept in)\b/i],
+  ["person_fact", /\b(?:likes?|prefers?|hates?|loves?|allergic|works at|lives in|born|married|birthday)\b/i],
+  ["commitment", /\b(?:promised?|owe[sd]?|need to|have to|must|should|agreed|committed|due|deadline)\b/i],
+  ["event", /\b(?:appointment|meeting|interview|flight|concert|party|dinner|trip|expires?|renew|check-?in|check-?out)\b/i],
+  ["preference", /\b(?:i like|i prefer|i love|i hate|i enjoy|favorite|favourite|my go-to)\b/i],
+];
+
+export class LocalMemoryExtractionProvider implements MemoryExtractionProvider {
+  async extract(text: string): Promise<ExtractionResult> {
+    let memoryType: MemoryType = "other";
+    for (const [type, pattern] of TYPE_PATTERNS) {
+      if (pattern.test(text)) {
+        memoryType = type;
+        break;
+      }
+    }
+
+    const subject = extractSubject(text, memoryType);
+
+    return {
+      memoryType,
+      canonicalText: text.trim(),
+      payload: { subject },
+      confidence: 0.7,
+    };
+  }
+}
+
 // Needed to satisfy the AppSettings import (used indirectly by EmbeddingProvider interface)
 export type { AppSettings, MemoryType };

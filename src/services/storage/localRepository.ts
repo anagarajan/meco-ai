@@ -1,5 +1,5 @@
 import { db, defaultSettings } from "./database";
-import type { AppSettings, ChatMessage, MemoryEmbedding, MemoryItem, Reminder, StoredAsset } from "../../types/domain";
+import type { AppSettings, ChatMessage, MemoryEmbedding, MemoryItem, RecurrenceRule, Reminder, StoredAsset } from "../../types/domain";
 import { createId } from "../../utils/ids";
 
 export async function ensureSettings(): Promise<AppSettings> {
@@ -99,18 +99,19 @@ export async function clearChatMessages(): Promise<void> {
 }
 
 export async function wipeAllData(): Promise<void> {
-  await db.transaction("rw", db.messages, db.memory_items, db.memory_embeddings, db.assets, async () => {
+  await db.transaction("rw", db.messages, db.memory_items, db.memory_embeddings, db.assets, db.reminders, async () => {
     await db.messages.clear();
     await db.memory_items.clear();
     await db.memory_embeddings.clear();
     await db.assets.clear();
+    await db.reminders.clear();
   });
 }
 
 export async function exportData(): Promise<Record<string, unknown>> {
   return {
     exported_at: new Date().toISOString(),
-    schema_version: 2,
+    schema_version: 3,
     messages: await db.messages.toArray(),
     memory_items: await db.memory_items.toArray(),
     memory_embeddings: await db.memory_embeddings.toArray(),
@@ -164,12 +165,20 @@ export async function importData(raw: unknown): Promise<{ imported: number; skip
 
 // ── Reminders ──────────────────────────────────────────────────────
 
-export async function createReminder(memoryId: string, remindAt: Date): Promise<Reminder> {
+export async function createReminder(
+  memoryId: string,
+  remindAt: Date,
+  options: { label?: string; recurrence?: RecurrenceRule; aiSuggested?: boolean } = {},
+): Promise<Reminder> {
   const reminder: Reminder = {
     id: createId("rem"),
     memory_id: memoryId,
+    label: options.label ?? "",
     remind_at: remindAt.toISOString(),
     fired: false,
+    active: true,
+    recurrence: options.recurrence,
+    ai_suggested: options.aiSuggested ?? false,
     created_at: new Date().toISOString(),
   };
   await db.reminders.put(reminder);
@@ -177,16 +186,45 @@ export async function createReminder(memoryId: string, remindAt: Date): Promise<
 }
 
 export async function getPendingReminders(): Promise<Reminder[]> {
-  return db.reminders.filter((r) => !r.fired).toArray();
+  return db.reminders.filter((r) => !r.fired && r.active !== false).toArray();
 }
 
 export async function markReminderFired(reminderId: string): Promise<void> {
   const r = await db.reminders.get(reminderId);
-  if (r) await db.reminders.put({ ...r, fired: true });
+  if (r) await db.reminders.put({ ...r, fired: true, last_fired_at: new Date().toISOString() });
 }
 
 export async function getReminderForMemory(memoryId: string): Promise<Reminder | undefined> {
   return db.reminders.filter((r) => r.memory_id === memoryId && !r.fired).first();
+}
+
+export async function listAllReminders(): Promise<Reminder[]> {
+  return db.reminders.orderBy("remind_at").reverse().toArray();
+}
+
+export async function updateReminder(reminder: Reminder): Promise<void> {
+  await db.reminders.put(reminder);
+}
+
+export async function deleteReminder(reminderId: string): Promise<void> {
+  await db.reminders.delete(reminderId);
+}
+
+export async function snoozeReminder(reminderId: string, until: Date): Promise<void> {
+  const r = await db.reminders.get(reminderId);
+  if (!r) return;
+  await db.reminders.put({
+    ...r,
+    snoozed_until: until.toISOString(),
+    remind_at: until.toISOString(),
+    fired: false,
+  });
+}
+
+export async function toggleReminderActive(reminderId: string): Promise<void> {
+  const r = await db.reminders.get(reminderId);
+  if (!r) return;
+  await db.reminders.put({ ...r, active: !r.active });
 }
 
 export async function sweepRawMedia(retentionDays: number): Promise<void> {
