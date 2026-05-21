@@ -34,7 +34,7 @@ tags:
 
 ## What Didn't Work
 
-The spread form passes each table as a separate variadic argument. When Dexie receives more positional arguments than expected, it may parse the callback as one of the table arguments or fail to construct the transaction scope correctly. No TypeScript error is produced because the spread matches a valid (but wrong) overload.
+The spread form passes each table as a separate positional argument. Dexie ships explicit positional overloads only up to four tables — a five-table spread exceeds the last overload, meaning `tsc` would flag it as a type error (the callback lands in a slot typed as `string | Table`, not as the scope function). If `tsc --noEmit` is not part of the CI pipeline, this error goes unnoticed until runtime.
 
 ## Solution
 
@@ -58,12 +58,13 @@ The `importData()` function in the same file correctly uses the array form and s
 
 ## Why This Works
 
-Dexie's TypeScript overloads for `transaction()` accept `tables: Table[]` (array) as the second argument for multi-table transactions. The array form is unambiguous and correctly enumerates all stores that should participate in the transaction's scope.
+Dexie's TypeScript overloads for `transaction()` accept `readonly (string | Table)[]` as the second argument for multi-table transactions (the array also accepts table name strings as an alternative to direct `Table` references). The array form is unambiguous and correctly enumerates all stores in the transaction scope.
 
 ## Prevention
 
-- **Use the array form for all multi-table transactions.** Single-table transactions (`db.transaction("rw", db.messages, ...)`) work with a direct table reference, but two or more tables must always be wrapped in an array.
-- **Reference `importData()` in `localRepository.ts`** as the in-repo example of the correct pattern.
+- **Use the array form for all multi-table transactions.** Single-table transactions work with a direct table reference, but two or more tables must always be wrapped in an array.
+- **Run `tsc --noEmit` in CI.** The five-table positional form produces a compile error — type-checking would have caught this before it reached runtime.
+- **Reference `importData()` in `localRepository.ts`** as the in-repo example of the correct array pattern.
 
 ## Related Issues
 

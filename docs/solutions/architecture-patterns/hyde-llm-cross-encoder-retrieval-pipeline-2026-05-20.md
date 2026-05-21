@@ -62,11 +62,14 @@ Rank all memories by the combined embedding, apply heuristic boosts, and take th
 const RETRIEVAL_POOL_SIZE = 10;
 
 const initialCandidates = pool
-  .map((memory) => ({
-    memory,
-    semanticScore: cosineSimilarity(combinedEmbedding, memory.embedding ?? []),
-    finalScore: rerank(memory, semanticScore, querySubject, queryType),
-  }))
+  .map((memory) => {
+    const semanticScore = cosineSimilarity(combinedEmbedding, memory.embedding ?? []);
+    return {
+      memory,
+      semanticScore,
+      finalScore: rerank(memory, semanticScore, querySubject, queryType),
+    };
+  })
   .sort((a, b) => b.finalScore - a.finalScore)
   .slice(0, RETRIEVAL_POOL_SIZE);
 ```
@@ -77,7 +80,7 @@ Early exit: if the best candidate's raw semantic score is below `0.02`, the ques
 
 ### Stage 3: LLM Cross-Encoder Reranking
 
-Pass the top 10 candidates through the LLM as a cross-encoder — it sees both the question and each candidate together:
+Pass the top 10 candidates through the LLM as a cross-encoder — it sees both the question and each candidate together (the joint-encoding guarantee is provider-dependent; `rerankCandidates()` must present them together for true cross-encoder scoring):
 
 ```typescript
 const FINAL_TOP_K = 3;
@@ -102,7 +105,7 @@ The cross-encoder catches relevance that vector distance alone misses (semantic 
 
 | Approach | Strength | Weakness |
 |----------|----------|----------|
-| Raw query embedding only | Fast, zero extra API calls | Short queries produce poor embeddings; type mismatch between query and stored fact |
+| Raw query embedding only | Fast, zero extra API calls | Short queries produce poor embeddings; semantic mismatch between question form and declarative stored facts |
 | HyDE averaging | Bridges the query-fact semantic gap | Adds one LLM call and one extra embed; hypothetical can drift |
 | Heuristic reranker only | CPU-only, handles recency/confidence | Cannot catch semantic relevance mismatches |
 | LLM cross-encoder only | Highest precision | Expensive at scale; cannot run on all memories |
