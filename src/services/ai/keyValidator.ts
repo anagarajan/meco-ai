@@ -1,5 +1,9 @@
 export type KeyValidationStatus = "idle" | "testing" | "valid" | "invalid" | "network_error";
 
+function checkGroqFormat(key: string): boolean {
+  return key.startsWith("gsk_") && key.length > 20;
+}
+
 export interface KeyValidationResult {
   status: Exclude<KeyValidationStatus, "idle" | "testing">;
   message: string;
@@ -40,6 +44,35 @@ export async function validateOpenAIKey(apiKey: string): Promise<KeyValidationRe
       };
     }
     return { status: "network_error", message: "Could not reach OpenAI. Check your connection." };
+  }
+}
+
+export async function validateGroqKey(apiKey: string): Promise<KeyValidationResult> {
+  if (!apiKey.trim()) {
+    return { status: "invalid", message: "No key entered." };
+  }
+  if (!checkGroqFormat(apiKey)) {
+    return { status: "invalid", message: "Key format looks wrong — Groq keys start with gsk_" };
+  }
+
+  try {
+    const response = await fetch("https://api.groq.com/openai/v1/models", {
+      credentials: "omit",
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+
+    if (response.ok) return { status: "valid", message: "Key is valid and working." };
+    if (response.status === 401) return { status: "invalid", message: "Invalid key — authentication failed." };
+    if (response.status === 429) return { status: "valid", message: "Key is valid but rate-limited." };
+    return { status: "invalid", message: `Unexpected response (HTTP ${response.status}).` };
+  } catch {
+    if (checkGroqFormat(apiKey)) {
+      return {
+        status: "network_error",
+        message: "Live test blocked by browser security (CORS). Key format looks correct — save it and try asking a question to confirm.",
+      };
+    }
+    return { status: "network_error", message: "Could not reach Groq. Check your connection." };
   }
 }
 

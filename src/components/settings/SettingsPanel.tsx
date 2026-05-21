@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { ChevronRight, CheckCircle, XCircle, WifiOff, Loader2 } from "lucide-react";
+import { ChevronRight, CheckCircle, XCircle, WifiOff, Loader2, X, ClipboardCheck } from "lucide-react";
 import type { AppSettings } from "../../types/domain";
 import { updatePasscode } from "../../services/privacy/privacyService";
 import { reindexAllMemories } from "../../services/storage/migrationService";
-import { validateOpenAIKey, validateAnthropicKey, type KeyValidationStatus } from "../../services/ai/keyValidator";
+import { validateOpenAIKey, validateAnthropicKey, validateGroqKey, type KeyValidationStatus } from "../../services/ai/keyValidator";
+import { useClipboardKeyDetector } from "../../hooks/useClipboardKeyDetector";
+import { GetApiKeyButton } from "./GetApiKeyButton";
 import { cn } from "@/lib/utils";
 
 interface SettingsPanelProps {
@@ -101,6 +103,13 @@ function ProviderCapabilities({ provider }: { provider: AppSettings["default_ai_
       { label: "Vision", color: "bg-[#FF9500]/10 text-[#FF9500]" },
       { label: "Transcription*", color: "bg-ios-gray-5 text-ios-gray-1" },
     ],
+    groq: [
+      { label: "Local embed", color: "bg-ios-green/10 text-ios-green" },
+      { label: "Extraction", color: "bg-ios-blue/10 text-ios-blue" },
+      { label: "Reasoning", color: "bg-ios-purple/10 text-ios-purple" },
+      { label: "Transcription", color: "bg-ios-red/10 text-ios-red" },
+      { label: "No vision", color: "bg-ios-gray-5 text-ios-gray-1" },
+    ],
   };
 
   return (
@@ -113,6 +122,11 @@ function ProviderCapabilities({ provider }: { provider: AppSettings["default_ai_
       {provider === "anthropic" && (
         <p className="w-full text-[11px] text-ios-gray-1 mt-1">
           * Transcription uses OpenAI Whisper if an OpenAI key is also provided, otherwise browser speech.
+        </p>
+      )}
+      {provider === "groq" && (
+        <p className="w-full text-[11px] text-ios-gray-1 mt-1">
+          Free tier · no credit card required · 14,400 req/day. Images are not supported — use OpenAI or Anthropic for image memories.
         </p>
       )}
     </div>
@@ -128,6 +142,10 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
   const [openaiMessage, setOpenaiMessage] = useState("");
   const [anthropicStatus, setAnthropicStatus] = useState<KeyValidationStatus>("idle");
   const [anthropicMessage, setAnthropicMessage] = useState("");
+  const [groqStatus, setGroqStatus] = useState<KeyValidationStatus>("idle");
+  const [groqMessage, setGroqMessage] = useState("");
+
+  const { detectedKey, detectedProvider, dismiss: dismissClipboard } = useClipboardKeyDetector(settings);
 
   async function testOpenAIKey() {
     setOpenaiStatus("testing");
@@ -143,9 +161,69 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
     setAnthropicMessage(result.message);
   }
 
+  async function testGroqKey() {
+    setGroqStatus("testing");
+    const result = await validateGroqKey(settings.groq_api_key ?? "");
+    setGroqStatus(result.status);
+    setGroqMessage(result.message);
+  }
+
+  async function fillDetectedKey() {
+    if (!detectedKey || !detectedProvider) return;
+    const keyField = detectedProvider === "openai" ? "openai_api_key"
+      : detectedProvider === "anthropic" ? "anthropic_api_key"
+      : "groq_api_key";
+    await onChange({ ...settings, [keyField]: detectedKey });
+    dismissClipboard();
+    // Trigger validation immediately so the user sees confirmation
+    if (detectedProvider === "openai") {
+      setOpenaiStatus("testing");
+      const result = await validateOpenAIKey(detectedKey);
+      setOpenaiStatus(result.status);
+      setOpenaiMessage(result.message);
+    } else if (detectedProvider === "anthropic") {
+      setAnthropicStatus("testing");
+      const result = await validateAnthropicKey(detectedKey);
+      setAnthropicStatus(result.status);
+      setAnthropicMessage(result.message);
+    } else {
+      setGroqStatus("testing");
+      const result = await validateGroqKey(detectedKey);
+      setGroqStatus(result.status);
+      setGroqMessage(result.message);
+    }
+  }
+
   return (
     <div className="px-4 py-4 pb-10">
       <h2 className="text-[28px] font-bold text-ios-label mb-4 px-1">Settings</h2>
+
+      {/* Clipboard key detection banner */}
+      {detectedKey && detectedProvider && (
+        <div className="flex items-center gap-3 bg-ios-blue/8 border border-ios-blue/20 rounded-ios-xl px-4 py-3 mb-4">
+          <ClipboardCheck size={18} className="text-ios-blue shrink-0 mt-0.5" />
+          <p className="text-[14px] text-ios-blue leading-snug flex-1">
+            <span className="font-semibold capitalize">{detectedProvider}</span> key detected in clipboard
+          </p>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => void fillDetectedKey()}
+              className="px-3 h-7 rounded-[8px] bg-ios-blue text-white text-[13px] font-semibold border-0"
+            >
+              Fill
+            </button>
+            <button
+              type="button"
+              onClick={dismissClipboard}
+              className="w-6 h-6 flex items-center justify-center rounded-full text-ios-blue hover:bg-ios-blue/10 border-0"
+              aria-label="Dismiss"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Privacy notice */}
       <div className="flex gap-3 bg-ios-green/8 border border-ios-green/20 rounded-ios-xl px-4 py-3 mb-6">
@@ -180,6 +258,7 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
           >
             <option value="openai">OpenAI</option>
             <option value="anthropic">Anthropic (Claude)</option>
+            <option value="groq">Groq (free tier)</option>
           </select>
         </SettingsRow>
         <ProviderCapabilities provider={settings.default_ai_provider} />
@@ -190,7 +269,10 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
       <SettingsGroup>
         <div className="px-4 py-3 space-y-3">
           <div>
-            <p className="text-[15px] text-ios-label mb-1.5">API Key</p>
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-[15px] text-ios-label">API Key</p>
+              <GetApiKeyButton provider="openai" />
+            </div>
             <input
               type="password"
               value={settings.openai_api_key ?? ""}
@@ -238,7 +320,10 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
       {settings.default_ai_provider === "anthropic" && <SettingsGroup>
         <div className="px-4 py-3 space-y-3">
           <div>
-            <p className="text-[15px] text-ios-label mb-1.5">API Key</p>
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-[15px] text-ios-label">API Key</p>
+              <GetApiKeyButton provider="anthropic" />
+            </div>
             <input
               type="password"
               value={settings.anthropic_api_key ?? ""}
@@ -279,6 +364,58 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
           </div>
           <p className="text-[12px] text-ios-gray-1 leading-relaxed">
             Claude handles reasoning, memory extraction, and image understanding. Embeddings use a local n-gram engine (no API call needed). Audio transcription uses OpenAI Whisper if an OpenAI key is also configured.
+          </p>
+        </div>
+      </SettingsGroup>}
+
+      {/* Groq — only shown when Groq is the selected provider */}
+      {settings.default_ai_provider === "groq" && <SectionHeader title="Groq" />}
+      {settings.default_ai_provider === "groq" && <SettingsGroup>
+        <div className="px-4 py-3 space-y-3">
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-[15px] text-ios-label">API Key</p>
+              <GetApiKeyButton provider="groq" />
+            </div>
+            <input
+              type="password"
+              value={settings.groq_api_key ?? ""}
+              onChange={(e) => {
+                setGroqStatus("idle");
+                void onChange({ ...settings, groq_api_key: e.target.value });
+              }}
+              placeholder="gsk_… stored locally"
+              className={inputClass}
+            />
+            <KeyStatusBadge status={groqStatus} message={groqMessage} />
+          </div>
+          <button
+            type="button"
+            disabled={groqStatus === "testing" || !settings.groq_api_key}
+            onClick={() => void testGroqKey()}
+            className={cn(
+              "w-full h-9 rounded-ios-sm text-[14px] font-medium border-0 transition-colors",
+              groqStatus === "testing" || !settings.groq_api_key
+                ? "bg-ios-gray-5 text-ios-gray-2 cursor-not-allowed"
+                : "bg-ios-purple/10 text-ios-purple hover:bg-ios-purple/20",
+            )}
+          >
+            {groqStatus === "testing" ? "Testing…" : "Test key"}
+          </button>
+          <div>
+            <p className="text-[15px] text-ios-label mb-1.5">Model</p>
+            <select
+              value={settings.groq_model ?? "llama-3.3-70b-versatile"}
+              onChange={(e) => void onChange({ ...settings, groq_model: e.target.value })}
+              className={cn(selectClass, "w-full")}
+            >
+              <option value="llama-3.3-70b-versatile">Llama 3.3 70B (default)</option>
+              <option value="llama-3.1-8b-instant">Llama 3.1 8B (fastest)</option>
+              <option value="gemma2-9b-it">Gemma 2 9B</option>
+            </select>
+          </div>
+          <p className="text-[12px] text-ios-gray-1 leading-relaxed">
+            Get a free key at console.groq.com — no credit card required. Free tier includes 14,400 requests/day, sufficient for personal use.
           </p>
         </div>
       </SettingsGroup>}

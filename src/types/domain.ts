@@ -45,13 +45,15 @@ export interface AppSettings {
   passcode_hash?: string;
   auto_delete_raw_media_days: number;
   autosave_mode: "explicit" | "assisted";
-  default_ai_provider: "openai" | "anthropic";
+  default_ai_provider: "openai" | "anthropic" | "groq";
   openai_api_key?: string;
   openai_model?: string;
   openai_embedding_model?: string;
   openai_transcription_model?: string;
   anthropic_api_key?: string;
   anthropic_model?: string;
+  groq_api_key?: string;
+  groq_model?: string;
   embedding_version?: number;
   updated_at: string;
 }

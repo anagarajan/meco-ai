@@ -139,7 +139,21 @@ Browser close triggers `appStateChange` → clipboard detection picks up key aut
 
 ---
 
-## Phase 4: OpenAI OAuth with PKCE (Day 3–5)
+## Phase 4: OpenAI OAuth with PKCE — BLOCKED
+
+> **Status: Blocked — OpenAI does not provide public OAuth 2.0 for third-party API access.**
+>
+> As of May 2026, `platform.openai.com` has no OAuth client registration page. There is no
+> authorization server that issues API-scoped tokens to third-party apps. The "Sign in with
+> ChatGPT" program announced May 2025 provides identity only (not API delegation) and is
+> invite-only. The PKCE architecture below is preserved for reference and can be activated
+> if OpenAI opens a public OAuth program.
+>
+> **Revised approach:** Phases 3A + 3B (clipboard detection + in-app browser) already deliver
+> the core friction-reduction goal: tap "Get my key →" → log in inside the app → copy key →
+> return → clipboard banner auto-fills. This is the primary UX path for Week 1.
+
+## Phase 4: OpenAI OAuth with PKCE (Deferred — Blocked)
 
 ### 4A — Vercel Edge Function
 
@@ -231,7 +245,7 @@ App.addListener('appUrlOpen', async (event) => {
 
 | Risk | Severity | Mitigation |
 |------|----------|------------|
-| OpenAI OAuth `client_id` requires platform registration and approval | **High** — blocks Phase 4 if not approved | Register Day 1. If rejected, Phase 4 becomes guided setup (same browser flow, user copies key manually after logging in). |
+| OpenAI OAuth `client_id` requires platform registration and approval | **Confirmed blocker** — OpenAI has no public OAuth for third-party API access as of May 2026 | Phase 4 deferred. Phases 3A/3B (clipboard + in-app browser) are the primary low-friction path. Revisit if OpenAI opens OAuth to third parties. |
 | Clipboard permission denied on iOS | Medium | Show rationale before requesting; graceful fallback if denied |
 | `meco://` deep link not firing on cold start (iOS) | Medium | Test on real device early; known Capacitor edge case |
 | PKCE `codeVerifier` lost if app killed mid-OAuth | Low | Store in both `sessionStorage` and `localStorage`; clear after successful exchange |
@@ -243,11 +257,11 @@ App.addListener('appUrlOpen', async (event) => {
 
 | Day | Work |
 |-----|------|
-| 1 | Phase 1: Groq provider, validator, settings UI. Test on simulator. Also: register app on OpenAI platform. |
+| 1 | Phase 1: Groq provider, validator, settings UI. Test on simulator. |
 | 2 | Phase 2: Install plugins, sync, URL scheme. Phase 3A: clipboard hook + banner. |
 | 3 | Phase 3B: `GetApiKeyButton` + in-app browser. End-to-end test: open groq.com, copy key, return, banner fills. |
-| 4 | Phase 4A + 4B: Vercel edge function + PKCE service. |
-| 5 | Phase 4C + 4D: deep link handler + OAuth UI. End-to-end OAuth test on real device. |
+| 4 | Polish + edge cases. E2E test all three providers (OpenAI, Anthropic, Groq) with clipboard + in-app browser. |
+| 5 | Buffer / stretch: capabilities badge, Groq model selector, error states, App Store prep. Phase 4 deferred (OpenAI OAuth blocked). |
 
 ---
 
@@ -259,5 +273,5 @@ App.addListener('appUrlOpen', async (event) => {
 | Plugin install + URL scheme | Low | 1 |
 | Clipboard detection | Low | 2–3 |
 | In-app browser buttons | Low | 2 |
-| OpenAI OAuth (PKCE + edge fn + deep link + UI) | High | 8–10 |
-| **Total** | **Medium-High** | **~18–21 hrs** |
+| OpenAI OAuth (PKCE + edge fn + deep link + UI) | **Deferred** | — |
+| **Total (active)** | **Low-Medium** | **~9–11 hrs** |

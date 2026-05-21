@@ -81,7 +81,7 @@ export function App() {
   }
 
   const useCloudTranscription = !!(settings.cloud_inference_enabled && settings.openai_api_key);
-  const hasApiKey = !!(settings.openai_api_key || settings.anthropic_api_key);
+  const hasApiKey = !!(settings.openai_api_key || settings.anthropic_api_key || settings.groq_api_key);
 
   // Hard gate — app is unusable without at least one API key.
   // Once in setup mode, render the full settings panel so the user can enter their key.
@@ -109,9 +109,9 @@ export function App() {
           <Key size={28} className="text-white" />
         </div>
         <div className="text-center max-w-xs">
-          <h1 className="text-[22px] font-bold text-ios-label mb-2">API key required</h1>
+          <h1 className="text-[22px] font-bold text-ios-label mb-2">Add an API key to get started</h1>
           <p className="text-[15px] text-ios-gray-1 leading-relaxed">
-            MeCo.AI requires an OpenAI or Anthropic API key to work. Your key is stored only on this device and never shared.
+            MeCo.AI needs an AI provider key to work. Groq is free with no credit card required. Your key is stored only on this device.
           </p>
         </div>
         <div className="w-full max-w-xs space-y-3">
@@ -123,7 +123,7 @@ export function App() {
             Add API key
           </button>
           <p className="text-[12px] text-ios-gray-2 text-center leading-relaxed">
-            Get a key at platform.openai.com or console.anthropic.com
+            Free: console.groq.com · Paid: platform.openai.com or console.anthropic.com
           </p>
         </div>
       </div>

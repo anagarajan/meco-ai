@@ -12,6 +12,12 @@ import {
   AnthropicMemoryExtractionProvider,
   AnthropicImageExtractionProvider,
 } from "./anthropicProvider";
+import {
+  GroqReasoningProvider,
+  GroqTranscriptionProvider,
+  GroqImageExtractionProvider,
+  GroqMemoryExtractionProvider,
+} from "./groqProvider";
 import type {
   EmbeddingProvider,
   ImageExtractionProvider,
@@ -29,21 +35,37 @@ export interface AIRegistry {
 }
 
 export function getAIRegistry(settings: AppSettings): AIRegistry {
-  // Resolve effective provider: if the configured provider has no key, fall
-  // back to whichever key is actually present so Anthropic-only users still
-  // work even when the default_ai_provider is "openai".
   const wantsOpenAI = settings.default_ai_provider === "openai";
+  const wantsAnthropic = settings.default_ai_provider === "anthropic";
+  const wantsGroq = settings.default_ai_provider === "groq";
   const hasOpenAI = !!settings.openai_api_key;
   const hasAnthropic = !!settings.anthropic_api_key;
+  const hasGroq = !!settings.groq_api_key;
 
-  const useOpenAI = (wantsOpenAI && hasOpenAI) || (!wantsOpenAI && !hasAnthropic && hasOpenAI);
-  const useAnthropic = (!wantsOpenAI && hasAnthropic) || (wantsOpenAI && !hasOpenAI && hasAnthropic);
+  // ── Groq ───────────────────────────────────────────────────────
+  // Reasoning + extraction + transcription (Whisper) via Groq.
+  // Embedding: local n-gram (Groq has no embedding endpoint).
+  // Image: not supported — throws a user-visible error on attempt.
+  const useGroq = (wantsGroq && hasGroq) || (!wantsOpenAI && !wantsAnthropic && !hasOpenAI && !hasAnthropic && hasGroq);
+  if (useGroq) {
+    return {
+      embeddingProvider: new LocalEmbeddingProvider(),
+      imageProvider: new GroqImageExtractionProvider(),
+      transcriptionProvider: new GroqTranscriptionProvider(),
+      memoryExtractionProvider: new GroqMemoryExtractionProvider(),
+      reasoningProvider: new GroqReasoningProvider(),
+    };
+  }
 
   // ── Anthropic ──────────────────────────────────────────────────
   // Reasoning + extraction + image via Claude.
   // Embedding: local hashing (Anthropic has no embedding endpoint).
   // Transcription: OpenAI Whisper if key provided, otherwise returns empty
   // string (voice note is saved without transcription text).
+  const useAnthropic =
+    (wantsAnthropic && hasAnthropic) ||
+    (!wantsOpenAI && !wantsGroq && hasAnthropic) ||
+    (wantsOpenAI && !hasOpenAI && hasAnthropic);
   if (useAnthropic) {
     return {
       embeddingProvider: new LocalEmbeddingProvider(),
@@ -58,6 +80,7 @@ export function getAIRegistry(settings: AppSettings): AIRegistry {
 
   // ── OpenAI ─────────────────────────────────────────────────────
   // All capabilities via OpenAI (embeddings, reasoning, extraction, image, transcription).
+  const useOpenAI = hasOpenAI;
   if (useOpenAI) {
     return {
       embeddingProvider: new OpenAIEmbeddingProvider(),
@@ -68,5 +91,5 @@ export function getAIRegistry(settings: AppSettings): AIRegistry {
     };
   }
 
-  throw new Error("No valid API key configured. Go to Settings and add an OpenAI or Anthropic key.");
+  throw new Error("No valid API key configured. Go to Settings and add an OpenAI, Anthropic, or Groq key.");
 }

@@ -13,6 +13,14 @@ const config: CapacitorConfig = {
     // Allow inline media playback (needed for voice recording UI)
     iosScheme: 'capacitor',
   },
+  plugins: {
+    // App plugin handles appStateChange (clipboard detection) and appUrlOpen (deep links)
+    App: {},
+    // Browser plugin opens provider key pages in an in-app sheet
+    Browser: {},
+    // Clipboard plugin reads copied API keys on app resume
+    Clipboard: {},
+  },
 };
 
 export default config;

@@ -1,0 +1,204 @@
+import type { AppSettings, MemoryType } from "../../types/domain";
+import type {
+  ExtractionResult,
+  ImageExtractionProvider,
+  MemoryExtractionProvider,
+  ReasoningProvider,
+  TranscriptionProvider,
+} from "./types";
+
+const VALID_MEMORY_TYPES: MemoryType[] = [
+  "object_location",
+  "person_fact",
+  "commitment",
+  "event",
+  "preference",
+  "other",
+];
+
+async function groqFetch<T>(endpoint: string, apiKey: string, body: Record<string, unknown>): Promise<T> {
+  const response = await fetch(`https://api.groq.com/openai/v1/${endpoint}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Groq request failed with ${response.status}`);
+  }
+  return response.json() as Promise<T>;
+}
+
+export class GroqReasoningProvider implements ReasoningProvider {
+  async answer(question: string, context: string[], settings: AppSettings): Promise<string> {
+    const apiKey = settings.groq_api_key;
+    if (!apiKey) throw new Error("Missing Groq API key");
+
+    const result = await groqFetch<{ choices: Array<{ message: { content: string } }> }>(
+      "chat/completions",
+      apiKey,
+      {
+        model: settings.groq_model ?? "llama-3.3-70b-versatile",
+        messages: [
+          {
+            role: "system",
+            content:
+              "Answer using only the provided memory context. State uncertainty and conflicts explicitly. Keep provenance outside the answer body.",
+          },
+          {
+            role: "user",
+            content: `Question: ${question}\n\nMemory context:\n${context.map((item, index) => `${index + 1}. ${item}`).join("\n")}`,
+          },
+        ],
+      },
+    );
+
+    return result.choices[0]?.message.content?.trim() ?? "";
+  }
+
+  async generateHypotheticalAnswer(question: string, settings: AppSettings): Promise<string> {
+    const apiKey = settings.groq_api_key;
+    if (!apiKey) throw new Error("Missing Groq API key");
+
+    const result = await groqFetch<{ choices: Array<{ message: { content: string } }> }>(
+      "chat/completions",
+      apiKey,
+      {
+        model: settings.groq_model ?? "llama-3.3-70b-versatile",
+        max_tokens: 100,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a personal memory assistant. Given a question, write a short factual statement (1-2 sentences) that would be the ideal memory entry answering it. Write it as a stored fact, not as a question or explanation. Be specific and concise.",
+          },
+          { role: "user", content: question },
+        ],
+      },
+    );
+
+    return result.choices[0]?.message.content?.trim() ?? question;
+  }
+
+  async rerankCandidates(question: string, candidates: string[], settings: AppSettings): Promise<number[]> {
+    const apiKey = settings.groq_api_key;
+    if (!apiKey) throw new Error("Missing Groq API key");
+
+    const numbered = candidates.map((c, i) => `${i + 1}. ${c}`).join("\n");
+
+    const result = await groqFetch<{ choices: Array<{ message: { content: string } }> }>(
+      "chat/completions",
+      apiKey,
+      {
+        model: settings.groq_model ?? "llama-3.3-70b-versatile",
+        max_tokens: 100,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a relevance scorer. Given a question and candidate memories, rate each memory's relevance to the question on a scale of 0-10 (10 = perfect answer, 0 = completely irrelevant). Respond with ONLY a JSON array of numbers in the same order as the candidates. Example: [8, 3, 6]",
+          },
+          {
+            role: "user",
+            content: `Question: ${question}\n\nCandidate memories:\n${numbered}`,
+          },
+        ],
+      },
+    );
+
+    const raw = result.choices[0]?.message.content?.trim() ?? "[]";
+    try {
+      const scores = JSON.parse(raw) as unknown;
+      if (Array.isArray(scores) && scores.length === candidates.length) {
+        return scores.map((s) => Math.min(10, Math.max(0, Number(s) || 0)));
+      }
+    } catch {
+      // Parse failure — fall through
+    }
+    return candidates.map(() => 5);
+  }
+}
+
+export class GroqTranscriptionProvider implements TranscriptionProvider {
+  async transcribeAudio(blob: Blob, settings: AppSettings): Promise<string> {
+    const apiKey = settings.groq_api_key;
+    if (!apiKey) throw new Error("Missing Groq API key");
+
+    const mimeToExt: Record<string, string> = {
+      "audio/mp4": "m4a",
+      "audio/webm": "webm",
+      "audio/webm;codecs=opus": "webm",
+      "audio/ogg;codecs=opus": "ogg",
+      "audio/ogg": "ogg",
+    };
+    const ext = mimeToExt[blob.type] ?? "webm";
+
+    const formData = new FormData();
+    formData.append("file", blob, `voice.${ext}`);
+    formData.append("model", "whisper-large-v3-turbo");
+
+    const response = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: formData,
+    });
+    if (!response.ok) throw new Error(`Groq transcription failed with ${response.status}`);
+    const result = (await response.json()) as { text?: string };
+    return result.text ?? "";
+  }
+}
+
+export class GroqImageExtractionProvider implements ImageExtractionProvider {
+  async extractImageText(_blob: Blob, _settings: AppSettings): Promise<string[]> {
+    throw new Error("Image extraction is not supported with Groq. Switch to OpenAI or Anthropic for image support.");
+  }
+}
+
+export class GroqMemoryExtractionProvider implements MemoryExtractionProvider {
+  async extract(text: string, settings: AppSettings): Promise<ExtractionResult> {
+    const apiKey = settings.groq_api_key;
+    if (!apiKey) throw new Error("Groq API key is required.");
+
+    const result = await groqFetch<{ choices: Array<{ message: { content: string } }> }>(
+      "chat/completions",
+      apiKey,
+      {
+        model: settings.groq_model ?? "llama-3.3-70b-versatile",
+        messages: [
+          {
+            role: "system",
+            content: `Extract a memory from the user's text. Respond with a JSON object only (no markdown):
+{
+  "memory_type": "object_location" | "person_fact" | "commitment" | "event" | "preference" | "other",
+  "canonical_text": "clean normalized version of the fact",
+  "subject": "the main noun/person/thing this is about, or null",
+  "confidence": 0.0 to 1.0
+}`,
+          },
+          { role: "user", content: text },
+        ],
+      },
+    );
+
+    const raw = JSON.parse(result.choices[0]?.message.content ?? "{}") as {
+      memory_type?: string;
+      canonical_text?: string;
+      subject?: string | null;
+      confidence?: number;
+    };
+
+    const memoryType: MemoryType = VALID_MEMORY_TYPES.includes(raw.memory_type as MemoryType)
+      ? (raw.memory_type as MemoryType)
+      : "other";
+
+    return {
+      memoryType,
+      canonicalText: raw.canonical_text ?? text,
+      payload: { subject: raw.subject ?? undefined },
+      confidence: Math.min(1, Math.max(0, raw.confidence ?? 0.85)),
+    };
+  }
+}
