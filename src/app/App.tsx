@@ -11,6 +11,7 @@ import { ReminderManager } from "../components/reminders/ReminderManager";
 import { OnboardingOverlay } from "../components/onboarding/OnboardingOverlay";
 import { PrivacyPanel } from "../components/settings/PrivacyPanel";
 import { SettingsPanel } from "../components/settings/SettingsPanel";
+import { GetApiKeyButton } from "../components/settings/GetApiKeyButton";
 import { Sidebar } from "../components/layout/Sidebar";
 import { TabBar } from "../components/layout/TabBar";
 import { useMemoryCompanion } from "../hooks/useMemoryCompanion";
@@ -115,15 +116,19 @@ export function App() {
           </p>
         </div>
         <div className="w-full max-w-xs space-y-3">
+          <GetApiKeyButton
+            provider="groq"
+            className="w-full h-12 rounded-[14px] justify-center text-[17px] font-semibold bg-ios-purple text-white border-0 hover:bg-ios-purple-dk"
+          />
           <button
             type="button"
             onClick={() => setActivePanel("settings")}
-            className="w-full h-12 rounded-[14px] bg-ios-purple text-white text-[17px] font-semibold border-0 hover:bg-ios-purple-dk transition-colors"
+            className="w-full h-11 rounded-[14px] bg-ios-gray-5 text-ios-label text-[15px] font-medium border-0 hover:bg-ios-gray-4 transition-colors"
           >
-            Add API key
+            I have an API key
           </button>
           <p className="text-[12px] text-ios-gray-2 text-center leading-relaxed">
-            Free: console.groq.com · Paid: platform.openai.com or console.anthropic.com
+            Also supports OpenAI and Anthropic
           </p>
         </div>
       </div>

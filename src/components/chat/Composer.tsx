@@ -90,6 +90,7 @@ export function Composer({ busy, useCloudTranscription, settings, onSubmit }: Co
   const voiceSupported = useCloudTranscription || isSupported;
   const displayError = voiceError ?? speechError;
   const canSend = !busy && (text.trim().length > 0 || !!imageBlob);
+  const imageSupported = settings?.default_ai_provider !== "groq";
 
   // Show voice recording panel (cloud transcription)
   if (voiceMode && useCloudTranscription) {
@@ -213,8 +214,15 @@ export function Composer({ busy, useCloudTranscription, settings, onSubmit }: Co
         {mode === "remember" && (
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center justify-center w-[42px] h-[42px] rounded-full bg-ios-gray-5 text-ios-gray-1 hover:bg-ios-gray-4 border-0 shrink-0 transition-colors"
+            disabled={!imageSupported}
+            title={imageSupported ? undefined : "Image not supported with Groq — switch to OpenAI or Anthropic in Settings"}
+            onClick={() => imageSupported && fileInputRef.current?.click()}
+            className={cn(
+              "flex items-center justify-center w-[42px] h-[42px] rounded-full border-0 shrink-0 transition-colors",
+              imageSupported
+                ? "bg-ios-gray-5 text-ios-gray-1 hover:bg-ios-gray-4"
+                : "bg-ios-gray-5 text-ios-gray-3 opacity-40 cursor-not-allowed",
+            )}
           >
             <Image size={18} />
           </button>
