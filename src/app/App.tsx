@@ -17,6 +17,8 @@ import { TabBar } from "../components/layout/TabBar";
 import { useMemoryCompanion } from "../hooks/useMemoryCompanion";
 import { useOnboarding } from "../hooks/useOnboarding";
 import { useTheme } from "../hooks/useTheme";
+import { Capacitor } from "@capacitor/core";
+import { LocalNotifications } from "@capacitor/local-notifications";
 
 export function App() {
   const {
@@ -61,6 +63,20 @@ export function App() {
     };
     window.addEventListener("meco-update-ready", handler);
     return () => window.removeEventListener("meco-update-ready", handler);
+  }, []);
+
+  // Navigate to Reminders panel when user taps a local notification
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let removeListener: (() => void) | undefined;
+    LocalNotifications.addListener("localNotificationActionPerformed", () => {
+      setActivePanel("memories");
+      setMemoryView("reminders");
+    }).then((handle) => {
+      removeListener = () => void handle.remove();
+    }).catch(() => undefined);
+    return () => { removeListener?.(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function applyUpdate() {

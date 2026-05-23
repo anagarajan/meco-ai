@@ -5,7 +5,7 @@ import {
   deleteReminder as deleteReminderInDb,
   toggleReminderActive as toggleInDb,
 } from "../services/storage/localRepository";
-import { snoozeReminder as snoozeInService } from "../services/reminders/reminderService";
+import { snoozeReminder as snoozeInService, cancelScheduledReminder } from "../services/reminders/reminderService";
 
 export function useReminders(memories: MemoryItem[]) {
   const [reminders, setReminders] = useState<Reminder[]>([]);
@@ -26,11 +26,17 @@ export function useReminders(memories: MemoryItem[]) {
   }
 
   async function remove(reminderId: string): Promise<void> {
+    await cancelScheduledReminder(reminderId);
     await deleteReminderInDb(reminderId);
     setReminders((prev) => prev.filter((r) => r.id !== reminderId));
   }
 
   async function toggle(reminderId: string): Promise<void> {
+    const reminder = reminders.find((r) => r.id === reminderId);
+    if (reminder?.active) {
+      // Deactivating — cancel the scheduled notification
+      await cancelScheduledReminder(reminderId);
+    }
     await toggleInDb(reminderId);
     setReminders((prev) =>
       prev.map((r) => (r.id === reminderId ? { ...r, active: !r.active } : r)),
