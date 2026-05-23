@@ -10,10 +10,11 @@ interface ComposerProps {
   busy: boolean;
   useCloudTranscription: boolean;
   settings: AppSettings | null;
+  prefillText?: string;
   onSubmit: (payload: { mode: ComposerMode; text: string; imageBlob?: Blob; audioBlob?: Blob }) => Promise<void>;
 }
 
-export function Composer({ busy, useCloudTranscription, settings, onSubmit }: ComposerProps) {
+export function Composer({ busy, useCloudTranscription, settings, prefillText, onSubmit }: ComposerProps) {
   const [mode, setMode] = useState<ComposerMode>("remember");
   const [text, setText] = useState("");
   const [imageBlob, setImageBlob] = useState<Blob | undefined>();
@@ -32,6 +33,10 @@ export function Composer({ busy, useCloudTranscription, settings, onSubmit }: Co
     resetTranscript();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
+
+  useEffect(() => {
+    if (prefillText) setText(prefillText);
+  }, [prefillText]);
 
   async function submitWith(overrideText: string, audioBlob?: Blob): Promise<void> {
     if (!overrideText.trim() && !imageBlob && !audioBlob) return;

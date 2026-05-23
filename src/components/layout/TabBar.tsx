@@ -1,4 +1,4 @@
-import { BrainCircuit, BookMarked, ShieldCheck, Settings } from "lucide-react";
+import { BrainCircuit, BookMarked, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ActivePanel } from "../../types/domain";
 
@@ -11,7 +11,6 @@ interface Tab {
 const TABS: Tab[] = [
   { id: "chat",     label: "Chat",     icon: BrainCircuit },
   { id: "memories", label: "Memories", icon: BookMarked },
-  { id: "privacy",  label: "Privacy",  icon: ShieldCheck },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 

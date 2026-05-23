@@ -1,7 +1,11 @@
-import { useState } from "react";
-import { ChevronRight, CheckCircle, XCircle, WifiOff, Loader2, X, ClipboardCheck } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import {
+  ChevronRight, CheckCircle, XCircle, WifiOff, Loader2, X, ClipboardCheck,
+  ShieldCheck, Download, Upload, Trash2, Cloud, CloudOff, TriangleAlert,
+  HardDrive, ShieldAlert, FileText,
+} from "lucide-react";
 import type { AppSettings } from "../../types/domain";
-import { updatePasscode } from "../../services/privacy/privacyService";
+import { updatePasscode, downloadExport, importFromFile, wipeDeviceData, getStorageEstimate, type StorageEstimate } from "../../services/privacy/privacyService";
 import { reindexAllMemories } from "../../services/storage/migrationService";
 import { validateOpenAIKey, validateAnthropicKey, validateGroqKey, type KeyValidationStatus } from "../../services/ai/keyValidator";
 import { useClipboardKeyDetector } from "../../hooks/useClipboardKeyDetector";
@@ -11,7 +15,22 @@ import { cn } from "@/lib/utils";
 interface SettingsPanelProps {
   settings: AppSettings;
   onChange: (settings: AppSettings) => Promise<void>;
+  onAfterWipe?: () => Promise<void>;
 }
+
+const isNativeApp = typeof window !== "undefined" && !!(window as unknown as Record<string, unknown>).Capacitor;
+
+const dataStorageBullets = isNativeApp
+  ? [
+      "All data is stored locally on your device within the app's private container.",
+      "Cloud inference is optional and only active when you enable it and provide an API key.",
+      "API keys are stored in the app's local storage and are never sent to third parties other than the respective AI provider.",
+    ]
+  : [
+      "Text, memories, embeddings, images, and voice blobs are stored on-device in IndexedDB.",
+      "Cloud inference is optional and only active when you enable it and provide an API key.",
+      "Secrets in browser state are vulnerable if your device or browser profile is compromised.",
+    ];
 
 function SectionHeader({ title }: { title: string }) {
   return (
@@ -86,7 +105,6 @@ function KeyStatusBadge({ status, message }: { status: KeyValidationStatus; mess
   );
 }
 
-// Badge showing which capabilities each provider covers
 function ProviderCapabilities({ provider }: { provider: AppSettings["default_ai_provider"] }) {
   const caps: Record<string, { label: string; color: string }[]> = {
     openai: [
@@ -133,7 +151,7 @@ function ProviderCapabilities({ provider }: { provider: AppSettings["default_ai_
   );
 }
 
-export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
+export function SettingsPanel({ settings, onChange, onAfterWipe }: SettingsPanelProps) {
   const [passcode, setPasscode] = useState("");
   const [savedPasscode, setSavedPasscode] = useState(false);
   const [reindexState, setReindexState] = useState<"idle" | "running" | "done">("idle");
@@ -145,7 +163,17 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
   const [groqStatus, setGroqStatus] = useState<KeyValidationStatus>("idle");
   const [groqMessage, setGroqMessage] = useState("");
 
+  const [storageEst, setStorageEst] = useState<StorageEstimate | null>(null);
+  const [importState, setImportState] = useState<"idle" | "importing" | "done" | "error">("idle");
+  const [importMsg, setImportMsg] = useState("");
+  const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const { detectedKey, detectedProvider, dismiss: dismissClipboard } = useClipboardKeyDetector(settings);
+
+  useEffect(() => {
+    getStorageEstimate().then(setStorageEst).catch(() => undefined);
+  }, []);
 
   async function testOpenAIKey() {
     setOpenaiStatus("testing");
@@ -175,7 +203,6 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
       : "groq_api_key";
     await onChange({ ...settings, [keyField]: detectedKey });
     dismissClipboard();
-    // Trigger validation immediately so the user sees confirmation
     if (detectedProvider === "openai") {
       setOpenaiStatus("testing");
       const result = await validateOpenAIKey(detectedKey);
@@ -191,6 +218,19 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
       const result = await validateGroqKey(detectedKey);
       setGroqStatus(result.status);
       setGroqMessage(result.message);
+    }
+  }
+
+  async function handleImport(file: File) {
+    setImportState("importing");
+    try {
+      const { imported, skipped } = await importFromFile(file);
+      setImportMsg(`Imported ${imported} items.${skipped > 0 ? ` ${skipped} already existed and were skipped.` : ""}`);
+      setImportState("done");
+      await onAfterWipe?.();
+    } catch (err) {
+      setImportMsg(err instanceof Error ? err.message : "Import failed.");
+      setImportState("error");
     }
   }
 
@@ -229,11 +269,13 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
       <div className="flex gap-3 bg-ios-green/8 border border-ios-green/20 rounded-ios-xl px-4 py-3 mb-6">
         <span className="text-ios-green text-[18px] leading-none mt-0.5">🔒</span>
         <p className="text-[13px] text-ios-green leading-relaxed">
-          API keys are stored only in your browser's local storage — they never leave your device or touch our servers.
+          {isNativeApp
+            ? "API keys are stored in the app's private container on your device — they never leave your device or touch our servers."
+            : "API keys are stored only in your browser's local storage — they never leave your device or touch our servers."}
         </p>
       </div>
 
-      {/* AI Behaviour */}
+      {/* ── AI Provider ───────────────────────────────────────────── */}
       <SectionHeader title="AI Behaviour" />
       <SettingsGroup>
         <SettingsRow label="Autosave mode" hint="Explicit only saves when you say &quot;remember that…&quot;">
@@ -264,7 +306,7 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
         <ProviderCapabilities provider={settings.default_ai_provider} />
       </SettingsGroup>
 
-      {/* OpenAI */}
+      {/* ── OpenAI ───────────────────────────────────────────────── */}
       <SectionHeader title="OpenAI" />
       <SettingsGroup>
         <div className="px-4 py-3 space-y-3">
@@ -276,10 +318,7 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
             <input
               type="password"
               value={settings.openai_api_key ?? ""}
-              onChange={(e) => {
-                setOpenaiStatus("idle");
-                void onChange({ ...settings, openai_api_key: e.target.value });
-              }}
+              onChange={(e) => { setOpenaiStatus("idle"); void onChange({ ...settings, openai_api_key: e.target.value }); }}
               placeholder="sk-… stored locally"
               className={inputClass}
             />
@@ -315,113 +354,149 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
         </div>
       </SettingsGroup>
 
-      {/* Anthropic — only shown when Claude is the selected provider */}
+      {/* ── Anthropic ────────────────────────────────────────────── */}
       {settings.default_ai_provider === "anthropic" && <SectionHeader title="Anthropic (Claude)" />}
-      {settings.default_ai_provider === "anthropic" && <SettingsGroup>
-        <div className="px-4 py-3 space-y-3">
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <p className="text-[15px] text-ios-label">API Key</p>
-              <GetApiKeyButton provider="anthropic" />
+      {settings.default_ai_provider === "anthropic" && (
+        <SettingsGroup>
+          <div className="px-4 py-3 space-y-3">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-[15px] text-ios-label">API Key</p>
+                <GetApiKeyButton provider="anthropic" />
+              </div>
+              <input
+                type="password"
+                value={settings.anthropic_api_key ?? ""}
+                onChange={(e) => { setAnthropicStatus("idle"); void onChange({ ...settings, anthropic_api_key: e.target.value }); }}
+                placeholder="sk-ant-… stored locally"
+                className={inputClass}
+              />
+              <KeyStatusBadge status={anthropicStatus} message={anthropicMessage} />
             </div>
-            <input
-              type="password"
-              value={settings.anthropic_api_key ?? ""}
-              onChange={(e) => {
-                setAnthropicStatus("idle");
-                void onChange({ ...settings, anthropic_api_key: e.target.value });
-              }}
-              placeholder="sk-ant-… stored locally"
-              className={inputClass}
-            />
-            <KeyStatusBadge status={anthropicStatus} message={anthropicMessage} />
-          </div>
-          <button
-            type="button"
-            disabled={anthropicStatus === "testing" || !settings.anthropic_api_key}
-            onClick={() => void testAnthropicKey()}
-            className={cn(
-              "w-full h-9 rounded-ios-sm text-[14px] font-medium border-0 transition-colors",
-              anthropicStatus === "testing" || !settings.anthropic_api_key
-                ? "bg-ios-gray-5 text-ios-gray-2 cursor-not-allowed"
-                : "bg-ios-purple/10 text-ios-purple hover:bg-ios-purple/20",
-            )}
-          >
-            {anthropicStatus === "testing" ? "Testing…" : "Test key"}
-          </button>
-          <div>
-            <p className="text-[15px] text-ios-label mb-1.5">Model</p>
-            <select
-              value={settings.anthropic_model ?? "claude-haiku-4-5-20251001"}
-              onChange={(e) => void onChange({ ...settings, anthropic_model: e.target.value })}
-              className={cn(selectClass, "w-full")}
+            <button
+              type="button"
+              disabled={anthropicStatus === "testing" || !settings.anthropic_api_key}
+              onClick={() => void testAnthropicKey()}
+              className={cn(
+                "w-full h-9 rounded-ios-sm text-[14px] font-medium border-0 transition-colors",
+                anthropicStatus === "testing" || !settings.anthropic_api_key
+                  ? "bg-ios-gray-5 text-ios-gray-2 cursor-not-allowed"
+                  : "bg-ios-purple/10 text-ios-purple hover:bg-ios-purple/20",
+              )}
             >
-              <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (fastest)</option>
-              <option value="claude-sonnet-4-5">Claude Sonnet 4.5</option>
-              <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (best)</option>
-              <option value="claude-opus-4-6">Claude Opus 4.6 (most capable)</option>
-            </select>
+              {anthropicStatus === "testing" ? "Testing…" : "Test key"}
+            </button>
+            <div>
+              <p className="text-[15px] text-ios-label mb-1.5">Model</p>
+              <select
+                value={settings.anthropic_model ?? "claude-haiku-4-5-20251001"}
+                onChange={(e) => void onChange({ ...settings, anthropic_model: e.target.value })}
+                className={cn(selectClass, "w-full")}
+              >
+                <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (fastest)</option>
+                <option value="claude-sonnet-4-5">Claude Sonnet 4.5</option>
+                <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (best)</option>
+                <option value="claude-opus-4-6">Claude Opus 4.6 (most capable)</option>
+              </select>
+            </div>
+            <p className="text-[12px] text-ios-gray-1 leading-relaxed">
+              Claude handles reasoning, memory extraction, and image understanding. Embeddings use a local n-gram engine (no API call needed). Audio transcription uses OpenAI Whisper if an OpenAI key is also configured.
+            </p>
           </div>
-          <p className="text-[12px] text-ios-gray-1 leading-relaxed">
-            Claude handles reasoning, memory extraction, and image understanding. Embeddings use a local n-gram engine (no API call needed). Audio transcription uses OpenAI Whisper if an OpenAI key is also configured.
-          </p>
-        </div>
-      </SettingsGroup>}
+        </SettingsGroup>
+      )}
 
-      {/* Groq — only shown when Groq is the selected provider */}
+      {/* ── Groq ─────────────────────────────────────────────────── */}
       {settings.default_ai_provider === "groq" && <SectionHeader title="Groq" />}
-      {settings.default_ai_provider === "groq" && <SettingsGroup>
-        <div className="px-4 py-3 space-y-3">
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <p className="text-[15px] text-ios-label">API Key</p>
-              <GetApiKeyButton provider="groq" />
+      {settings.default_ai_provider === "groq" && (
+        <SettingsGroup>
+          <div className="px-4 py-3 space-y-3">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-[15px] text-ios-label">API Key</p>
+                <GetApiKeyButton provider="groq" />
+              </div>
+              <input
+                type="password"
+                value={settings.groq_api_key ?? ""}
+                onChange={(e) => { setGroqStatus("idle"); void onChange({ ...settings, groq_api_key: e.target.value }); }}
+                placeholder="gsk_… stored locally"
+                className={inputClass}
+              />
+              <KeyStatusBadge status={groqStatus} message={groqMessage} />
             </div>
-            <input
-              type="password"
-              value={settings.groq_api_key ?? ""}
-              onChange={(e) => {
-                setGroqStatus("idle");
-                void onChange({ ...settings, groq_api_key: e.target.value });
-              }}
-              placeholder="gsk_… stored locally"
-              className={inputClass}
-            />
-            <KeyStatusBadge status={groqStatus} message={groqMessage} />
-          </div>
-          <button
-            type="button"
-            disabled={groqStatus === "testing" || !settings.groq_api_key}
-            onClick={() => void testGroqKey()}
-            className={cn(
-              "w-full h-9 rounded-ios-sm text-[14px] font-medium border-0 transition-colors",
-              groqStatus === "testing" || !settings.groq_api_key
-                ? "bg-ios-gray-5 text-ios-gray-2 cursor-not-allowed"
-                : "bg-ios-purple/10 text-ios-purple hover:bg-ios-purple/20",
-            )}
-          >
-            {groqStatus === "testing" ? "Testing…" : "Test key"}
-          </button>
-          <div>
-            <p className="text-[15px] text-ios-label mb-1.5">Model</p>
-            <select
-              value={settings.groq_model ?? "llama-3.3-70b-versatile"}
-              onChange={(e) => void onChange({ ...settings, groq_model: e.target.value })}
-              className={cn(selectClass, "w-full")}
+            <button
+              type="button"
+              disabled={groqStatus === "testing" || !settings.groq_api_key}
+              onClick={() => void testGroqKey()}
+              className={cn(
+                "w-full h-9 rounded-ios-sm text-[14px] font-medium border-0 transition-colors",
+                groqStatus === "testing" || !settings.groq_api_key
+                  ? "bg-ios-gray-5 text-ios-gray-2 cursor-not-allowed"
+                  : "bg-ios-purple/10 text-ios-purple hover:bg-ios-purple/20",
+              )}
             >
-              <option value="llama-3.3-70b-versatile">Llama 3.3 70B (default)</option>
-              <option value="llama-3.1-8b-instant">Llama 3.1 8B (fastest)</option>
-              <option value="gemma2-9b-it">Gemma 2 9B</option>
-            </select>
+              {groqStatus === "testing" ? "Testing…" : "Test key"}
+            </button>
+            <div>
+              <p className="text-[15px] text-ios-label mb-1.5">Model</p>
+              <select
+                value={settings.groq_model ?? "llama-3.3-70b-versatile"}
+                onChange={(e) => void onChange({ ...settings, groq_model: e.target.value })}
+                className={cn(selectClass, "w-full")}
+              >
+                <option value="llama-3.3-70b-versatile">Llama 3.3 70B (default)</option>
+                <option value="llama-3.1-8b-instant">Llama 3.1 8B (fastest)</option>
+                <option value="gemma2-9b-it">Gemma 2 9B</option>
+              </select>
+            </div>
+            <p className="text-[12px] text-ios-gray-1 leading-relaxed">
+              Get a free key at console.groq.com — no credit card required. Free tier includes 14,400 requests/day, sufficient for personal use.
+            </p>
           </div>
-          <p className="text-[12px] text-ios-gray-1 leading-relaxed">
-            Get a free key at console.groq.com — no credit card required. Free tier includes 14,400 requests/day, sufficient for personal use.
+        </SettingsGroup>
+      )}
+
+      {/* ── Privacy & Data ───────────────────────────────────────── */}
+      <SectionHeader title="Privacy & Data" />
+
+      {/* Local-first status */}
+      <div className="rounded-ios-xl bg-ios-surface border border-ios-sep p-4 mb-3 flex items-start gap-3">
+        <div className="w-10 h-10 rounded-[10px] bg-ios-purple/10 flex items-center justify-center shrink-0 mt-[1px]">
+          <ShieldCheck size={20} className="text-ios-purple" />
+        </div>
+        <div>
+          <p className="text-[17px] font-semibold text-ios-label">Local-first storage</p>
+          <p className="text-[15px] text-ios-gray-1 mt-[2px] leading-snug">
+            No analytics, hidden sync, or backend required for the core app.
           </p>
         </div>
-      </SettingsGroup>}
+      </div>
 
-      {/* Privacy */}
-      <SectionHeader title="Privacy" />
+      {/* Data storage bullets */}
+      <div className="rounded-ios-xl overflow-hidden border border-ios-sep bg-ios-surface divide-y divide-ios-sep mb-3">
+        {dataStorageBullets.map((item, i) => (
+          <div key={i} className="flex items-start gap-3 px-4 py-3">
+            <span className="w-[6px] h-[6px] rounded-full bg-ios-gray-3 mt-[7px] shrink-0" />
+            <p className="text-[15px] text-ios-label leading-snug">{item}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Cloud inference status */}
+      <div className="rounded-ios-xl overflow-hidden border border-ios-sep bg-ios-surface mb-3">
+        <div className="flex items-center gap-3 px-4 py-3">
+          {settings.cloud_inference_enabled
+            ? <Cloud size={18} className="text-ios-blue shrink-0" />
+            : <CloudOff size={18} className="text-ios-gray-2 shrink-0" />}
+          <p className="text-[17px] text-ios-label flex-1">Cloud inference</p>
+          <span className={cn("text-[15px] font-medium", settings.cloud_inference_enabled ? "text-ios-blue" : "text-ios-gray-1")}>
+            {settings.cloud_inference_enabled ? "On" : "Off"}
+          </span>
+        </div>
+      </div>
+
+      {/* Raw media retention */}
       <SettingsGroup>
         <div className="px-4 py-3">
           <p className="text-[15px] text-ios-label mb-2">Raw media retention (days)</p>
@@ -436,7 +511,136 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
         </div>
       </SettingsGroup>
 
-      {/* App Lock */}
+      {/* Storage warnings */}
+      <SectionHeader title="Storage Warnings" />
+      <div className="rounded-ios-xl overflow-hidden border border-[#FF9500]/30 bg-[#FF9500]/5 divide-y divide-[#FF9500]/20 mb-3">
+        <div className="flex items-start gap-3 px-4 py-3">
+          <TriangleAlert size={17} className="text-[#FF9500] shrink-0 mt-[2px]" />
+          <div>
+            <p className="text-[15px] font-semibold text-ios-label leading-snug mb-1">
+              {isNativeApp ? "Uninstalling the app deletes all data" : "Removing the app deletes all data"}
+            </p>
+            <p className="text-[13px] text-ios-gray-1 leading-relaxed">
+              {isNativeApp
+                ? "Uninstalling MeCo AI permanently erases all memories, chat history, and settings. There is no recovery. Export your data first."
+                : "Deleting MeCo.AI from your home screen permanently erases all memories, chat history, and settings from this device. There is no recovery. Export your data first."}
+            </p>
+          </div>
+        </div>
+        {!isNativeApp && (
+          <div className="flex items-start gap-3 px-4 py-3">
+            <TriangleAlert size={17} className="text-[#FF9500] shrink-0 mt-[2px]" />
+            <div>
+              <p className="text-[15px] font-semibold text-ios-label leading-snug mb-1">
+                Clearing browser storage wipes everything
+              </p>
+              <p className="text-[13px] text-ios-gray-1 leading-relaxed">
+                Using "Clear history", "Clear website data", or resetting your browser will delete all stored memories. This includes Safari's Settings → Safari → Clear History and Website Data.
+              </p>
+            </div>
+          </div>
+        )}
+        <div className="flex items-start gap-3 px-4 py-3">
+          <TriangleAlert size={17} className="text-[#FF9500] shrink-0 mt-[2px]" />
+          <div>
+            <p className="text-[15px] font-semibold text-ios-label leading-snug mb-1">No cloud backup</p>
+            <p className="text-[13px] text-ios-gray-1 leading-relaxed">
+              Data exists only on this device. It is not synced across devices or backed up automatically. Use Export to save a local copy before switching devices or reinstalling.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Storage estimate */}
+      {storageEst && (
+        <>
+          <SectionHeader title="Storage" />
+          <SettingsGroup>
+            <div className="flex items-center gap-3 px-4 py-3">
+              <HardDrive size={18} className="text-ios-gray-1 shrink-0" />
+              <p className="text-[17px] text-ios-label flex-1">Used</p>
+              <span className="text-[15px] text-ios-gray-1">{storageEst.usedMB} MB of {storageEst.quotaMB} MB ({storageEst.percentUsed}%)</span>
+            </div>
+            <div className="flex items-center gap-3 px-4 py-3">
+              {(storageEst.persisted || isNativeApp)
+                ? <ShieldCheck size={18} className="text-ios-green shrink-0" />
+                : <ShieldAlert size={18} className="text-[#FF9500] shrink-0" />}
+              <div className="flex-1">
+                <p className="text-[17px] text-ios-label">Persistent storage</p>
+                {!storageEst.persisted && !isNativeApp && (
+                  <p className="text-[12px] text-[#FF9500] leading-snug mt-[2px]">
+                    Not granted — data may be evicted by the browser. Install as a PWA to protect it.
+                  </p>
+                )}
+                {isNativeApp && (
+                  <p className="text-[12px] text-ios-green leading-snug mt-[2px]">
+                    App storage is managed by iOS and protected from eviction.
+                  </p>
+                )}
+              </div>
+              <span className={cn("text-[15px] font-medium", (storageEst.persisted || isNativeApp) ? "text-ios-green" : "text-[#FF9500]")}>
+                {(storageEst.persisted || isNativeApp) ? "Yes" : "No"}
+              </span>
+            </div>
+          </SettingsGroup>
+        </>
+      )}
+
+      {/* ── Data Actions ─────────────────────────────────────────── */}
+      <SectionHeader title="Data Actions" />
+      <SettingsGroup>
+        <button
+          type="button"
+          onClick={() => void downloadExport()}
+          className="w-full flex items-center gap-3 px-4 py-3 text-left bg-transparent border-0 hover:bg-ios-gray-6/50 transition-colors"
+        >
+          <Download size={18} className="text-ios-purple shrink-0" />
+          <span className="text-[17px] text-ios-purple flex-1">Export local data</span>
+        </button>
+        <button
+          type="button"
+          disabled={importState === "importing"}
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full flex items-center gap-3 px-4 py-3 text-left bg-transparent border-0 hover:bg-ios-gray-6/50 transition-colors"
+        >
+          <Upload size={18} className="text-ios-blue shrink-0" />
+          <div className="flex-1">
+            <span className="text-[17px] text-ios-blue block">
+              {importState === "importing" ? "Importing…" : "Import from backup"}
+            </span>
+            {(importState === "done" || importState === "error") && (
+              <span className={cn("text-[13px] leading-snug", importState === "done" ? "text-ios-green" : "text-ios-red")}>
+                {importMsg}
+              </span>
+            )}
+          </div>
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void handleImport(file);
+            e.target.value = "";
+          }}
+        />
+        <button
+          type="button"
+          onClick={async () => {
+            if (!window.confirm("Wipe all local data? This cannot be undone.")) return;
+            await wipeDeviceData();
+            await onAfterWipe?.();
+          }}
+          className="w-full flex items-center gap-3 px-4 py-3 text-left bg-transparent border-0 hover:bg-ios-red/5 transition-colors"
+        >
+          <Trash2 size={18} className="text-ios-red shrink-0" />
+          <span className="text-[17px] text-ios-red flex-1">Wipe this device</span>
+        </button>
+      </SettingsGroup>
+
+      {/* ── App Lock ─────────────────────────────────────────────── */}
       <SectionHeader title="App Lock" />
       <SettingsGroup>
         <div className="px-4 py-3 space-y-2">
@@ -469,7 +673,7 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
         </div>
       </SettingsGroup>
 
-      {/* Diagnostics */}
+      {/* ── Diagnostics ──────────────────────────────────────────── */}
       <SectionHeader title="Diagnostics" />
       <SettingsGroup>
         <div className="px-4 py-3 space-y-1">
@@ -499,7 +703,20 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
         </div>
       </SettingsGroup>
 
-      {/* About */}
+      {/* ── Legal ────────────────────────────────────────────────── */}
+      <SectionHeader title="Legal" />
+      <SettingsGroup>
+        <button
+          type="button"
+          onClick={() => setShowPrivacyPolicy(true)}
+          className="w-full flex items-center gap-3 px-4 py-3 text-left bg-transparent border-0 hover:bg-ios-gray-6/50 transition-colors"
+        >
+          <FileText size={18} className="text-ios-purple shrink-0" />
+          <span className="text-[17px] text-ios-purple flex-1">Privacy Policy</span>
+        </button>
+      </SettingsGroup>
+
+      {/* ── About ────────────────────────────────────────────────── */}
       <SectionHeader title="About" />
       <SettingsGroup>
         <div className="flex items-center justify-between px-4 py-3">
@@ -510,6 +727,27 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
           </div>
         </div>
       </SettingsGroup>
+
+      {/* Privacy Policy modal */}
+      {showPrivacyPolicy && (
+        <div className="fixed inset-0 z-50 bg-ios-bg flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-ios-sep bg-ios-surface">
+            <span className="text-[17px] font-semibold text-ios-label">Privacy Policy</span>
+            <button
+              type="button"
+              onClick={() => setShowPrivacyPolicy(false)}
+              className="text-[17px] text-ios-purple font-medium bg-transparent border-0"
+            >
+              Done
+            </button>
+          </div>
+          <iframe
+            src="/privacy-policy.html"
+            title="Privacy Policy"
+            className="flex-1 w-full border-0"
+          />
+        </div>
+      )}
     </div>
   );
 }

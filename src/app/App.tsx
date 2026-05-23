@@ -1,4 +1,4 @@
-import { Moon, Sun, Trash2, Key, RefreshCw, Download } from "lucide-react";
+import { Moon, Sun, Trash2, Key, RefreshCw, Download, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Composer } from "../components/chat/Composer";
 import { Conversation } from "../components/chat/Conversation";
@@ -9,7 +9,7 @@ import { MemoryViewToggle, type MemoryView } from "../components/memory/MemoryVi
 import { AISuggestionBanner } from "../components/reminders/AISuggestionBanner";
 import { ReminderManager } from "../components/reminders/ReminderManager";
 import { OnboardingOverlay } from "../components/onboarding/OnboardingOverlay";
-import { PrivacyPanel } from "../components/settings/PrivacyPanel";
+import { WelcomeScreen } from "../components/onboarding/WelcomeScreen";
 import { SettingsPanel } from "../components/settings/SettingsPanel";
 import { GetApiKeyButton } from "../components/settings/GetApiKeyButton";
 import { Sidebar } from "../components/layout/Sidebar";
@@ -44,7 +44,23 @@ export function App() {
   } = useMemoryCompanion();
 
   const { theme, toggle: toggleTheme } = useTheme();
-  const { showOnboarding, dismiss: dismissOnboarding } = useOnboarding(memories.length, messages.length);
+  const {
+    showWelcome,
+    showOnboarding,
+    showFirstMemoryNudge,
+    dismissWelcome,
+    dismiss: dismissOnboarding,
+    dismissNudge,
+  } = useOnboarding(memories.length, messages.length);
+
+  const [prefillText, setPrefillText] = useState<string | undefined>();
+
+  // Auto-dismiss the first-memory nudge after 8 seconds
+  useEffect(() => {
+    if (!showFirstMemoryNudge) return;
+    const t = setTimeout(dismissNudge, 8000);
+    return () => clearTimeout(t);
+  }, [showFirstMemoryNudge, dismissNudge]);
 
   const [memoryView, setMemoryView] = useState<MemoryView>(
     () => (localStorage.getItem("meco-memory-view") as MemoryView) || "list",
@@ -99,6 +115,11 @@ export function App() {
 
   const useCloudTranscription = !!(settings.cloud_inference_enabled && settings.openai_api_key);
   const hasApiKey = !!(settings.openai_api_key || settings.anthropic_api_key || settings.groq_api_key);
+
+  // Welcome screen — shown once to new users before the API key gate
+  if (!hasApiKey && showWelcome) {
+    return <WelcomeScreen onDismiss={dismissWelcome} />;
+  }
 
   // Hard gate — app is unusable without at least one API key.
   // Once in setup mode, render the full settings panel so the user can enter their key.
@@ -194,8 +215,7 @@ export function App() {
             )}
             <h1 className="flex-1 text-[17px] font-semibold text-ios-label text-center">
               {activePanel === "chat"     ? "MeCo.AI" :
-               activePanel === "memories" ? "Memories"         :
-               activePanel === "privacy"  ? "Privacy"          : "Settings"}
+               activePanel === "memories" ? "Memories" : "Settings"}
             </h1>
             <div className="flex items-center gap-0.5">
               {activePanel === "chat" && memories.length > 0 && (
@@ -229,9 +249,14 @@ export function App() {
               {/* Scrollable messages */}
               <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
                 <Conversation messages={messages} />
-                {showOnboarding && <OnboardingOverlay onDismiss={dismissOnboarding} />}
+                {showOnboarding && (
+                  <OnboardingOverlay
+                    onDismiss={dismissOnboarding}
+                    onSuggest={(text) => { setPrefillText(text); dismissOnboarding(); }}
+                  />
+                )}
               </div>
-              {/* Reminder suggestion + Composer pinned above the tab bar */}
+              {/* Reminder suggestion + first-memory nudge + Composer pinned above the tab bar */}
               <div className="shrink-0 bg-ios-surface/80 backdrop-blur-[20px] border-t border-ios-sep pb-tab-bar">
                 {reminderSuggestion && (
                   <AISuggestionBanner
@@ -241,7 +266,17 @@ export function App() {
                     onDismiss={dismissReminderSuggestion}
                   />
                 )}
-                <Composer busy={busy} settings={settings} onSubmit={submit} useCloudTranscription={useCloudTranscription} />
+                {showFirstMemoryNudge && (
+                  <div className="flex items-center gap-2 px-4 py-2.5 bg-[#34C759]/10 border-b border-[#34C759]/20">
+                    <span className="flex-1 text-[13px] text-ios-label">
+                      ✓ Saved! Now switch to <strong>Ask</strong> and try: "What did I just save?"
+                    </span>
+                    <button type="button" onClick={dismissNudge} className="shrink-0 text-ios-gray-2 border-0 bg-transparent">
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+                <Composer busy={busy} settings={settings} onSubmit={submit} useCloudTranscription={useCloudTranscription} prefillText={prefillText} />
               </div>
             </>
           )}
@@ -257,11 +292,8 @@ export function App() {
                   {memoryView === "reminders" && <ReminderManager memories={memories} />}
                 </>
               )}
-              {activePanel === "privacy" && (
-                <PrivacyPanel settings={settings} onAfterWipe={refresh} />
-              )}
               {activePanel === "settings" && (
-                <SettingsPanel settings={settings} onChange={updateSettings} />
+                <SettingsPanel settings={settings} onChange={updateSettings} onAfterWipe={refresh} />
               )}
             </div>
           )}
@@ -281,8 +313,7 @@ export function App() {
           <header className="flex items-center justify-between h-10 px-4 bg-mac-sidebar/80 border-b border-ios-sep shrink-0">
             <p className="text-[13px] text-ios-gray-1">
               {activePanel === "chat"     ? "Chat" :
-               activePanel === "memories" ? "Memories" :
-               activePanel === "privacy"  ? "Privacy" : "Settings"}
+               activePanel === "memories" ? "Memories" : "Settings"}
             </p>
             {activePanel === "chat" && (
               <div className="flex items-center gap-2">
@@ -319,7 +350,12 @@ export function App() {
               <div className="flex flex-col h-full">
                 <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
                   <Conversation messages={messages} />
-                  {showOnboarding && <OnboardingOverlay onDismiss={dismissOnboarding} />}
+                  {showOnboarding && (
+                    <OnboardingOverlay
+                      onDismiss={dismissOnboarding}
+                      onSuggest={(text) => { setPrefillText(text); dismissOnboarding(); }}
+                    />
+                  )}
                 </div>
                 <div className="border-t border-ios-sep bg-ios-surface/60 backdrop-blur-sm shrink-0">
                   {reminderSuggestion && (
@@ -330,7 +366,17 @@ export function App() {
                       onDismiss={dismissReminderSuggestion}
                     />
                   )}
-                  <Composer busy={busy} settings={settings} onSubmit={submit} useCloudTranscription={useCloudTranscription} />
+                  {showFirstMemoryNudge && (
+                    <div className="flex items-center gap-2 px-4 py-2.5 bg-[#34C759]/10 border-b border-[#34C759]/20">
+                      <span className="flex-1 text-[13px] text-ios-label">
+                        ✓ Saved! Now switch to <strong>Ask</strong> and try: "What did I just save?"
+                      </span>
+                      <button type="button" onClick={dismissNudge} className="shrink-0 text-ios-gray-2 border-0 bg-transparent">
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
+                  <Composer busy={busy} settings={settings} onSubmit={submit} useCloudTranscription={useCloudTranscription} prefillText={prefillText} />
                 </div>
               </div>
             )}
@@ -344,14 +390,9 @@ export function App() {
                   : <MemoryTimeline memories={memories} onDelete={removeMemory} onEdit={editMemory} />}
               </div>
             )}
-            {activePanel === "privacy" && (
-              <div className="overflow-y-auto h-full p-6 max-w-2xl">
-                <PrivacyPanel settings={settings} onAfterWipe={refresh} />
-              </div>
-            )}
             {activePanel === "settings" && (
               <div className="overflow-y-auto h-full p-6 max-w-2xl">
-                <SettingsPanel settings={settings} onChange={updateSettings} />
+                <SettingsPanel settings={settings} onChange={updateSettings} onAfterWipe={refresh} />
               </div>
             )}
           </main>

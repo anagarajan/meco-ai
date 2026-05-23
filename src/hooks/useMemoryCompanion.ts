@@ -32,7 +32,7 @@ export function useMemoryCompanion() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [memories, setMemories] = useState<MemoryItem[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [activePanel, setActivePanel] = useState<"chat" | "memories" | "privacy" | "settings">("chat");
+  const [activePanel, setActivePanel] = useState<"chat" | "memories" | "settings">("chat");
   const [locked, setLocked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [reindexing, setReindexing] = useState(false);

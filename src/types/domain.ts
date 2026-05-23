@@ -9,7 +9,7 @@ export type MemoryType =
   | "other";
 export type ComposerMode = "remember" | "ask";
 export type SourceKind = "text" | "voice_note" | "image" | "mixed";
-export type ActivePanel = "chat" | "memories" | "privacy" | "settings";
+export type ActivePanel = "chat" | "memories" | "settings";
 
 export interface ChatMessage {
   id: string;
