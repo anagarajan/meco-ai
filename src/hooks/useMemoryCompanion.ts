@@ -103,25 +103,20 @@ export function useMemoryCompanion() {
         if (results && results.length > 0) {
           if (results.length === 1) {
             const { memory, duplicateWarning } = results[0];
-            const subjectLine = memory.payload_json.subject
-              ? "\nSubject: " + String(memory.payload_json.subject)
-              : "";
-            reply = "Memory saved.\nType: " + memory.memory_type + subjectLine + "\nConfidence: " + memory.confidence.toFixed(2);
+            const text = memory.canonical_text.length > 100
+              ? memory.canonical_text.slice(0, 100) + "…"
+              : memory.canonical_text;
+            reply = `Got it — I'll remember that.\n\n"${text}"`;
             if (duplicateWarning) {
-              reply += `\n\n⚠️ Similar memory exists: "${duplicateWarning}"`;
+              const dupe = duplicateWarning.length > 80 ? duplicateWarning.slice(0, 80) + "…" : duplicateWarning;
+              reply += `\n\nSimilar memory already exists: "${dupe}"`;
             }
           } else {
-            reply = `${results.length} memories saved from image.\n`;
-            reply += results
-              .map(({ memory, duplicateWarning }) => {
-                let line = `• ${memory.canonical_text} (${memory.memory_type}, ${memory.confidence.toFixed(2)})`;
-                if (duplicateWarning) line += ` ⚠️ similar: "${duplicateWarning}"`;
-                return line;
-              })
-              .join("\n");
+            reply = `Saved ${results.length} memories from the image.\n\n`;
+            reply += results.map(({ memory }) => `• ${memory.canonical_text}`).join("\n");
           }
         } else {
-          reply = "Could not save memory. Try rephrasing or switch to Assisted mode in Settings.";
+          reply = "I couldn't work out what to remember from that. Try being more specific, e.g. \"Remember that my passport is in the top drawer.\"";
         }
 
         await createMessage({ role: "assistant", modality: "text", text_content: reply });
@@ -142,8 +137,16 @@ export function useMemoryCompanion() {
           (payload.audioBlob
             ? await getAIRegistry(settings).transcriptionProvider.transcribeAudio(payload.audioBlob, settings)
             : "");
+
+        // Pass recent conversation as history so the LLM can resolve follow-ups.
+        // Trim each message to 200 chars to keep the context window manageable.
+        const history = messages
+          .filter((m) => m.role === "user" || m.role === "assistant")
+          .slice(-6)
+          .map((m) => ({ role: m.role as "user" | "assistant", text: m.text_content.slice(0, 200) }));
+
         const answer = effectiveQuestion
-          ? await answerMemoryQuestion(effectiveQuestion, settings)
+          ? await answerMemoryQuestion(effectiveQuestion, settings, history)
           : "Please type your question or use the voice button to ask by speaking.";
         await createMessage({ role: "assistant", modality: "text", text_content: answer });
       }

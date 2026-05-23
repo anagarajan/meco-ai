@@ -1,5 +1,6 @@
 import type { AppSettings, MemoryType } from "../../types/domain";
 import type {
+  ConversationTurn,
   ExtractionResult,
   ImageExtractionProvider,
   MemoryExtractionProvider,
@@ -39,18 +40,25 @@ function getText(res: AnthropicResponse): string {
 // ── Reasoning ──────────────────────────────────────────────────────
 
 export class AnthropicReasoningProvider implements ReasoningProvider {
-  async answer(question: string, context: string[], settings: AppSettings): Promise<string> {
+  async answer(question: string, context: string[], settings: AppSettings, history?: ConversationTurn[]): Promise<string> {
     const apiKey = settings.anthropic_api_key;
     if (!apiKey) throw new Error("Missing Anthropic API key");
+
+    const historyMessages = (history ?? []).map((t) => ({
+      role: t.role,
+      content: t.text,
+    }));
 
     const res = await anthropicFetch({
       model: settings.anthropic_model ?? "claude-haiku-4-5-20251001",
       max_tokens: 512,
       system:
         "You are a personal memory assistant. Answer using ONLY the provided memory context. " +
+        "Use the conversation history for follow-up questions and pronouns. " +
         "If the context doesn't contain the answer say so clearly. " +
         "Be concise and direct. State uncertainty explicitly.",
       messages: [
+        ...historyMessages,
         {
           role: "user",
           content:

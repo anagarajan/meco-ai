@@ -1,5 +1,6 @@
 import type { AppSettings, MemoryType } from "../../types/domain";
 import type {
+  ConversationTurn,
   ExtractionResult,
   ImageExtractionProvider,
   MemoryExtractionProvider,
@@ -33,9 +34,14 @@ async function groqFetch<T>(endpoint: string, apiKey: string, body: Record<strin
 }
 
 export class GroqReasoningProvider implements ReasoningProvider {
-  async answer(question: string, context: string[], settings: AppSettings): Promise<string> {
+  async answer(question: string, context: string[], settings: AppSettings, history?: ConversationTurn[]): Promise<string> {
     const apiKey = settings.groq_api_key;
     if (!apiKey) throw new Error("Missing Groq API key");
+
+    const historyMessages = (history ?? []).map((t) => ({
+      role: t.role,
+      content: t.text,
+    }));
 
     const result = await groqFetch<{ choices: Array<{ message: { content: string } }> }>(
       "chat/completions",
@@ -46,8 +52,11 @@ export class GroqReasoningProvider implements ReasoningProvider {
           {
             role: "system",
             content:
-              "Answer using only the provided memory context. State uncertainty and conflicts explicitly. Keep provenance outside the answer body.",
+              "You are a personal memory assistant. Answer using only the provided memory context. " +
+              "Use the conversation history for follow-up questions and pronouns. " +
+              "State uncertainty and conflicts explicitly. Be concise.",
           },
+          ...historyMessages,
           {
             role: "user",
             content: `Question: ${question}\n\nMemory context:\n${context.map((item, index) => `${index + 1}. ${item}`).join("\n")}`,

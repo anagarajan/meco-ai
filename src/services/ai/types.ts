@@ -19,8 +19,13 @@ export interface EmbeddingProvider {
   embed(text: string, settings: AppSettings): Promise<number[]>;
 }
 
+export interface ConversationTurn {
+  role: "user" | "assistant";
+  text: string;
+}
+
 export interface ReasoningProvider {
-  answer(question: string, context: string[], settings: AppSettings): Promise<string>;
+  answer(question: string, context: string[], settings: AppSettings, history?: ConversationTurn[]): Promise<string>;
   /** Generate a hypothetical memory that would answer the question (HyDE). */
   generateHypotheticalAnswer(question: string, settings: AppSettings): Promise<string>;
   /** Score each candidate memory's relevance to the question (0–10). Returns scores in same order as candidates. */

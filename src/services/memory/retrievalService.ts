@@ -2,6 +2,7 @@ import type { AppSettings, MemoryItem, MemoryType, RetrievalCandidate } from "..
 import { extractQuerySubject } from "../ai/localHeuristicProvider";
 import { getAIRegistry } from "../ai/registry";
 import { getActiveMemories } from "../storage/localRepository";
+import type { ConversationTurn } from "../ai/types";
 
 function inferQueryType(question: string): MemoryType | undefined {
   const s = question.toLowerCase();
@@ -95,7 +96,7 @@ const RETRIEVAL_POOL_SIZE = 10;
 /** Number of candidates to keep after LLM re-ranking. */
 const FINAL_TOP_K = 3;
 
-export async function answerMemoryQuestion(question: string, settings: AppSettings): Promise<string> {
+export async function answerMemoryQuestion(question: string, settings: AppSettings, history?: ConversationTurn[]): Promise<string> {
   const registry = getAIRegistry(settings);
   const queryType = inferQueryType(question);
   const querySubject = extractQuerySubject(question);
@@ -176,6 +177,6 @@ export async function answerMemoryQuestion(question: string, settings: AppSettin
 
   const reasoningContext = candidates.map((c) => c.memory.canonical_text);
 
-  const answerBody = await registry.reasoningProvider.answer(question, reasoningContext, settings);
+  const answerBody = await registry.reasoningProvider.answer(question, reasoningContext, settings, history);
   return formatAnswer(question, candidates, answerBody);
 }
